@@ -1,9 +1,9 @@
 # Use make if you want to compile libModelicaStandardTables.a on Windows/MinGW
 
-CC = gcc -m32
+CC = gcc
 AR = ar -ru
 
-CFLAGS = -O3 -I"zlib"
+CFLAGS = -O3 -I"zlib" -m32
 
 OBJS = \
 ModelicaStandardTables.o \
