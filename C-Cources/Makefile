@@ -30,7 +30,7 @@ ALL_OBJS = $(OBJS) $(ZLIB_OBJS)
 
 libModelicaStandardTables.a: $(ALL_OBJS)
 	$(AR) $@ $(ALL_OBJS)
-	cp libModelicaStandardTables.a linux64/libModelicaStandardTables.a
+	cp libModelicaStandardTables.a Library/linux64/libModelicaStandardTables.a
 
 ModelicaStandardTables.o : ModelicaStandardTables.c
 	$(CC) -c -DTABLE_SHARE=1 -DDUMMY_FUNCTION_USERTAB $(CFLAGS) ModelicaStandardTables.c
