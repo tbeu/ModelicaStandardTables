@@ -21,7 +21,7 @@
 
 
    Release Notes:
-      May 08, 2015:  by Thomas Beutlich, ITI GmbH.
+      May 09, 2015:  by Thomas Beutlich, ITI GmbH.
                      Added univariate Fritsch-Carlson-spline interpolation
                      (ticket #1039)
 
@@ -161,10 +161,6 @@ typedef double Cubic2D[15];
 /* Left and right interval indices (per interval) */
 typedef size_t Interval[2];
 
-/* Function type declaration for univariate cubic spline initialization */
-typedef Cubic1D* (*spline1DInit_Proc)(const double* table, size_t nRow,
-                                 size_t nCol, const int* cols, size_t nCols);
-
 typedef struct CombiTimeTable {
     char* fileName; /* Name of table file */
     char* tableName; /* Name of table */
@@ -191,9 +187,6 @@ typedef struct CombiTimeTable {
     double tOffset; /* Time offset, calculated by floor function, discrete,
         only used if extrapolation is PERIODIC */
     Interval* intervals; /* Event interval indices */
-    spline1DInit_Proc spline1DInit_Func; /* Pointer of cubic spline initialization
-        function, only used if smoothness is CONTINUOUS_DERIVATIVE or
-        MONOTONE_CONTINUOUS_DERIVATIVE */
 } CombiTimeTable;
 
 typedef struct CombiTable1D {
@@ -209,9 +202,6 @@ typedef struct CombiTable1D {
     size_t nCols; /* Number of columns of table to be interpolated */
     Cubic1D* spline; /* Pre-calculated cubic spline coefficients, only used if
         smoothness is CONTINUOUS_DERIVATIVE or MONOTONE_CONTINUOUS_DERIVATIVE */
-    spline1DInit_Proc spline1DInit_Func; /* Pointer of cubic spline initialization
-        function, only used if smoothness is CONTINUOUS_DERIVATIVE or
-        MONOTONE_CONTINUOUS_DERIVATIVE */
 } CombiTable1D;
 
 typedef struct CombiTable2D {
@@ -503,15 +493,14 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                 }
                 if (isValidCombiTimeTable((const CombiTimeTable*)tableID)) {
                     if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                        tableID->spline1DInit_Func = akimaSpline1DInit;
+                        /* Initialization of the cubic spline coefficients */
+                        tableID->spline = akimaSpline1DInit(table,
+                            tableID->nRow, tableID->nCol, (const int*)cols,
+                            tableID->nCols);
                     }
                     else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                        tableID->spline1DInit_Func = fritschCarlsonSpline1DInit;
-                        tableID->smoothness = CONTINUOUS_DERIVATIVE;
-                    }
-                    if (tableID->spline1DInit_Func) {
                         /* Initialization of the cubic spline coefficients */
-                        tableID->spline = tableID->spline1DInit_Func(table,
+                        tableID->spline = fritschCarlsonSpline1DInit(table,
                             tableID->nRow, tableID->nCol, (const int*)cols,
                             tableID->nCols);
                     }
@@ -575,15 +564,14 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                     }
                     if (isValidCombiTimeTable((const CombiTimeTable*)tableID)) {
                         if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                            tableID->spline1DInit_Func = akimaSpline1DInit;
+                            /* Initialization of the cubic spline coefficients */
+                            tableID->spline = akimaSpline1DInit(table,
+                                tableID->nRow, tableID->nCol, (const int*)cols,
+                                tableID->nCols);
                         }
                         else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                            tableID->spline1DInit_Func = fritschCarlsonSpline1DInit;
-                            tableID->smoothness = CONTINUOUS_DERIVATIVE;
-                        }
-                        if (tableID->spline1DInit_Func) {
                             /* Initialization of the cubic spline coefficients */
-                            tableID->spline = tableID->spline1DInit_Func(table,
+                            tableID->spline = fritschCarlsonSpline1DInit(table,
                                 tableID->nRow, tableID->nCol, (const int*)cols,
                                 tableID->nCols);
                         }
@@ -858,6 +846,7 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                         }
 
                         case CONTINUOUS_DERIVATIVE:
+                        case MONOTONE_CONTINUOUS_DERIVATIVE:
                             if (tableID->spline) {
                                 const double* c = tableID->spline[
                                     IDX(last, iCol - 1, tableID->nCols)];
@@ -890,7 +879,8 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                             const double t0 = TABLE_COL0(last);
                             const double y0 = TABLE(last, col);
 
-                            if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
+                            if (tableID->smoothness == CONTINUOUS_DERIVATIVE ||
+                                tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
                                 if (tableID->spline) {
                                     const double* c = tableID->spline[
                                         IDX(last, iCol - 1, tableID->nCols)];
@@ -1103,6 +1093,7 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
                         }
 
                         case CONTINUOUS_DERIVATIVE:
+                        case MONOTONE_CONTINUOUS_DERIVATIVE:
                             if (tableID->spline) {
                                 const double* c = tableID->spline[
                                     IDX(last, iCol - 1, tableID->nCols)];
@@ -1130,7 +1121,8 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
                         case LAST_TWO_POINTS:
                             last = (extrapolate == RIGHT) ? nRow - 2 : 0;
 
-                            if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
+                            if (tableID->smoothness == CONTINUOUS_DERIVATIVE ||
+                                tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
                                 if(tableID->spline) {
                                     const double* c = tableID->spline[
                                         IDX(last, iCol - 1, tableID->nCols)];
@@ -1333,7 +1325,8 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
                     tableID->eventInterval = 1;
                     iEnd = 0;
                 }
-                else if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
+                else if (tableID->smoothness == CONTINUOUS_DERIVATIVE ||
+                    tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
                     iStart = nRow - 1;
                     nextTimeEvent = tMax;
                     iEnd = 0;
@@ -1457,19 +1450,28 @@ double ModelicaStandardTables_CombiTimeTable_read(void* _tableID, int force,
                 if (!tableID->table) {
                     return 0.; /* Error */
                 }
-                if (tableID->smoothness == CONTINUOUS_DERIVATIVE &&
-                    tableID->nRow == 2) {
-                    tableID->smoothness = LINEAR_SEGMENTS;
+                if (tableID->nRow == 2) {
+	                if (tableID->smoothness == CONTINUOUS_DERIVATIVE ||
+	                    tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
+	                    tableID->smoothness = LINEAR_SEGMENTS;
+	                }
                 }
                 if (!isValidCombiTimeTable((const CombiTimeTable*)tableID)) {
                     return 0.; /* Error */
                 }
-                if (tableID->spline1DInit_Func) {
+                if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
                     /* Reinitialization of the cubic spline coefficients */
                     spline1DClose(tableID->spline);
-                    tableID->spline = tableID->spline1DInit_Func(tableID->table,
-                        tableID->nRow, tableID->nCol, (const int*)tableID->cols,
-                        tableID->nCols);
+                    tableID->spline = akimaSpline1DInit(
+                        (const double*)tableID->table, tableID->nRow,
+                        tableID->nCol, (const int*)tableID->cols, tableID->nCols);
+                }
+                else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
+                    /* Reinitialization of the cubic spline coefficients */
+                    spline1DClose(tableID->spline);
+                    tableID->spline = fritschCarlsonSpline1DInit(
+                        (const double*)tableID->table, tableID->nRow,
+                        tableID->nCol, (const int*)tableID->cols, tableID->nCols);
                 }
             }
         }
@@ -1545,15 +1547,14 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                 }
                 if (isValidCombiTable1D((const CombiTable1D*)tableID)) {
                     if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                        tableID->spline1DInit_Func = akimaSpline1DInit;
+                        /* Initialization of the cubic spline coefficients */
+                        tableID->spline = akimaSpline1DInit(table,
+                            tableID->nRow, tableID->nCol, (const int*)cols,
+                            tableID->nCols);
                     }
                     else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                        tableID->spline1DInit_Func = fritschCarlsonSpline1DInit;
-                        tableID->smoothness = CONTINUOUS_DERIVATIVE;
-                    }
-                    if (tableID->spline1DInit_Func) {
                         /* Initialization of the cubic spline coefficients */
-                        tableID->spline = tableID->spline1DInit_Func(table,
+                        tableID->spline = fritschCarlsonSpline1DInit(table,
                             tableID->nRow, tableID->nCol, (const int*)cols,
                             tableID->nCols);
                     }
@@ -1617,15 +1618,14 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                     }
                     if (isValidCombiTable1D((const CombiTable1D*)tableID)) {
                         if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                            tableID->spline1DInit_Func = akimaSpline1DInit;
+                            /* Initialization of the cubic spline coefficients */
+                            tableID->spline = akimaSpline1DInit(table,
+                                tableID->nRow, tableID->nCol, (const int*)cols,
+                                tableID->nCols);
                         }
                         else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                            tableID->spline1DInit_Func = fritschCarlsonSpline1DInit;
-                            tableID->smoothness = CONTINUOUS_DERIVATIVE;
-                        }
-                        if (tableID->spline1DInit_Func) {
                             /* Initialization of the cubic spline coefficients */
-                            tableID->spline = tableID->spline1DInit_Func(table,
+                            tableID->spline = fritschCarlsonSpline1DInit(table,
                                 tableID->nRow, tableID->nCol, (const int*)cols,
                                 tableID->nCols);
                         }
@@ -1763,6 +1763,7 @@ double ModelicaStandardTables_CombiTable1D_getValue(void* _tableID, int iCol,
                 }
 
                 case CONTINUOUS_DERIVATIVE:
+                case MONOTONE_CONTINUOUS_DERIVATIVE:
                     if (tableID->spline) {
                         const double* c = tableID->spline[
                             IDX(last, iCol - 1, tableID->nCols)];
@@ -1833,6 +1834,7 @@ double ModelicaStandardTables_CombiTable1D_getDerValue(void* _tableID, int iCol,
                     break;
 
                 case CONTINUOUS_DERIVATIVE:
+                case MONOTONE_CONTINUOUS_DERIVATIVE:
                     if (tableID->spline) {
                         const double* c = tableID->spline[
                             IDX(last, iCol - 1, tableID->nCols)];
@@ -1879,17 +1881,26 @@ double ModelicaStandardTables_CombiTable1D_read(void* _tableID, int force,
                 if (!tableID->table) {
                     return 0.; /* Error */
                 }
-                if (tableID->smoothness == CONTINUOUS_DERIVATIVE &&
-                    tableID->nRow == 2) {
-                    tableID->smoothness = LINEAR_SEGMENTS;
+                if (tableID->nRow == 2) {
+	                if (tableID->smoothness == CONTINUOUS_DERIVATIVE ||
+	                    tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
+	                    tableID->smoothness = LINEAR_SEGMENTS;
+	                }
                 }
                 if (!isValidCombiTable1D((const CombiTable1D*)tableID)) {
                     return 0.; /* Error */
                 }
-                if (tableID->spline1DInit_Func) {
+                if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
                     /* Reinitialization of the cubic spline coefficients */
                     spline1DClose(tableID->spline);
-                    tableID->spline = tableID->spline1DInit_Func(
+                    tableID->spline = akimaSpline1DInit(
+                        (const double*)tableID->table, tableID->nRow,
+                        tableID->nCol, (const int*)tableID->cols, tableID->nCols);
+                }
+                else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
+                    /* Reinitialization of the cubic spline coefficients */
+                    spline1DClose(tableID->spline);
+                    tableID->spline = fritschCarlsonSpline1DInit(
                         (const double*)tableID->table, tableID->nRow,
                         tableID->nCol, (const int*)tableID->cols, tableID->nCols);
                 }
@@ -2194,6 +2205,11 @@ double ModelicaStandardTables_CombiTable2D_getValue(void* _tableID, double u1,
                     }
                     break;
 
+                case MONOTONE_CONTINUOUS_DERIVATIVE:
+                    ModelicaError("Bivariate Fritsch-Carlson interpolation is "
+                        "not implemented\n");
+                    break;
+
                 default:
                     ModelicaError("Unknown smoothness kind\n");
                     break;
@@ -2256,6 +2272,11 @@ double ModelicaStandardTables_CombiTable2D_getValue(void* _tableID, double u1,
                                 2*c[1])*v1 + c[2], u1 - u11);
                         }
                     }
+                    break;
+
+                case MONOTONE_CONTINUOUS_DERIVATIVE:
+                    ModelicaError("Bivariate Fritsch-Carlson interpolation is "
+                        "not implemented\n");
                     break;
 
                 default:
@@ -2447,6 +2468,11 @@ double ModelicaStandardTables_CombiTable2D_getValue(void* _tableID, double u1,
                     }
                     break;
 
+                case MONOTONE_CONTINUOUS_DERIVATIVE:
+                    ModelicaError("Bivariate Fritsch-Carlson interpolation is "
+                        "not implemented\n");
+                    break;
+
                 default:
                     ModelicaError("Unknown smoothness kind\n");
                     break;
@@ -2519,6 +2545,11 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
                     }
                     break;
 
+                case MONOTONE_CONTINUOUS_DERIVATIVE:
+                    ModelicaError("Bivariate Fritsch-Carlson interpolation is "
+                        "not implemented\n");
+                    break;
+
                 default:
                     ModelicaError("Unknown smoothness kind\n");
                     break;
@@ -2573,6 +2604,11 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
                         }
                         der_y *= der_u1;
                     }
+                    break;
+
+                case MONOTONE_CONTINUOUS_DERIVATIVE:
+                    ModelicaError("Bivariate Fritsch-Carlson interpolation is "
+                        "not implemented\n");
                     break;
 
                 default:
@@ -2767,6 +2803,11 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
                     }
                     break;
 
+                case MONOTONE_CONTINUOUS_DERIVATIVE:
+                    ModelicaError("Bivariate Fritsch-Carlson interpolation is "
+                        "not implemented\n");
+                    break;
+
                 default:
                     ModelicaError("Unknown smoothness kind\n");
                     break;
@@ -2907,7 +2948,8 @@ static int isValidCombiTimeTable(const CombiTimeTable* tableID) {
 
             /* Check, whether first column values are monotonically or strictly
                increasing */
-            if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
+            if (tableID->smoothness == CONTINUOUS_DERIVATIVE ||
+                tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
                 size_t i;
                 for (i = 0; i < nRow - 1; i++) {
                     double t0 = TABLE_COL0(i);
