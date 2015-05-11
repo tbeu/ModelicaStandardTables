@@ -9,6 +9,6 @@ data from Text or MATLAB MAT-files, interpolation and extrapolation.
 ModelicaStandardTables is released under the terms of BSD3.
 
 ## Acknowledgement
-ExternData is based on the following third-party C projects
+ModelicaStandardTables is based on the following third-party C projects
 * [uthash](https://github.com/troydhanson/uthash) -
 Troy D. Hanson's C macros for hash tables and more 
