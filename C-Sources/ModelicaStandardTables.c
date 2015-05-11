@@ -23,7 +23,7 @@
    Release Notes:
       May 11, 2015:  by Thomas Beutlich, ITI GmbH.
                      Added univariate Fritsch-Butland-spline interpolation
-                     (ticket #1039)
+                     (ticket #1717)
 
       Apr. 16, 2015: by Thomas Beutlich, ITI GmbH.
                      Fixed event detection of CombiTimeTable with scaled time
@@ -501,13 +501,13 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                 }
                 if (isValidCombiTimeTable((const CombiTimeTable*)tableID)) {
                     if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                        /* Initialization of the cubic spline coefficients */
+                        /* Initialization of the cubic Hermite spline coefficients */
                         tableID->spline = akimaSpline1DInit(table,
                             tableID->nRow, tableID->nCol, (const int*)cols,
                             tableID->nCols);
                     }
                     else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                        /* Initialization of the cubic spline coefficients */
+                        /* Initialization of the cubic Hermite spline coefficients */
                         tableID->spline = fritschButlandSpline1DInit(table,
                             tableID->nRow, tableID->nCol, (const int*)cols,
                             tableID->nCols);
@@ -572,13 +572,13 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                     }
                     if (isValidCombiTimeTable((const CombiTimeTable*)tableID)) {
                         if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                            /* Initialization of the cubic spline coefficients */
+                            /* Initialization of the cubic Hermite spline coefficients */
                             tableID->spline = akimaSpline1DInit(table,
                                 tableID->nRow, tableID->nCol, (const int*)cols,
                                 tableID->nCols);
                         }
                         else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                            /* Initialization of the cubic spline coefficients */
+                            /* Initialization of the cubic Hermite spline coefficients */
                             tableID->spline = fritschButlandSpline1DInit(table,
                                 tableID->nRow, tableID->nCol, (const int*)cols,
                                 tableID->nCols);
@@ -1468,14 +1468,14 @@ double ModelicaStandardTables_CombiTimeTable_read(void* _tableID, int force,
                     return 0.; /* Error */
                 }
                 if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                    /* Reinitialization of the cubic spline coefficients */
+                    /* Reinitialization of the cubic Hermite spline coefficients */
                     spline1DClose(tableID->spline);
                     tableID->spline = akimaSpline1DInit(
                         (const double*)tableID->table, tableID->nRow,
                         tableID->nCol, (const int*)tableID->cols, tableID->nCols);
                 }
                 else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                    /* Reinitialization of the cubic spline coefficients */
+                    /* Reinitialization of the cubic Hermite spline coefficients */
                     spline1DClose(tableID->spline);
                     tableID->spline = fritschButlandSpline1DInit(
                         (const double*)tableID->table, tableID->nRow,
@@ -1555,13 +1555,13 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                 }
                 if (isValidCombiTable1D((const CombiTable1D*)tableID)) {
                     if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                        /* Initialization of the cubic spline coefficients */
+                        /* Initialization of the cubic Hermite spline coefficients */
                         tableID->spline = akimaSpline1DInit(table,
                             tableID->nRow, tableID->nCol, (const int*)cols,
                             tableID->nCols);
                     }
                     else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                        /* Initialization of the cubic spline coefficients */
+                        /* Initialization of the cubic Hermite spline coefficients */
                         tableID->spline = fritschButlandSpline1DInit(table,
                             tableID->nRow, tableID->nCol, (const int*)cols,
                             tableID->nCols);
@@ -1626,13 +1626,13 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                     }
                     if (isValidCombiTable1D((const CombiTable1D*)tableID)) {
                         if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                            /* Initialization of the cubic spline coefficients */
+                            /* Initialization of the cubic Hermite spline coefficients */
                             tableID->spline = akimaSpline1DInit(table,
                                 tableID->nRow, tableID->nCol, (const int*)cols,
                                 tableID->nCols);
                         }
                         else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                            /* Initialization of the cubic spline coefficients */
+                            /* Initialization of the cubic Hermite spline coefficients */
                             tableID->spline = fritschButlandSpline1DInit(table,
                                 tableID->nRow, tableID->nCol, (const int*)cols,
                                 tableID->nCols);
@@ -1899,14 +1899,14 @@ double ModelicaStandardTables_CombiTable1D_read(void* _tableID, int force,
                     return 0.; /* Error */
                 }
                 if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                    /* Reinitialization of the cubic spline coefficients */
+                    /* Reinitialization of the cubic Hermite spline coefficients */
                     spline1DClose(tableID->spline);
                     tableID->spline = akimaSpline1DInit(
                         (const double*)tableID->table, tableID->nRow,
                         tableID->nCol, (const int*)tableID->cols, tableID->nCols);
                 }
                 else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                    /* Reinitialization of the cubic spline coefficients */
+                    /* Reinitialization of the cubic Hermite spline coefficients */
                     spline1DClose(tableID->spline);
                     tableID->spline = fritschButlandSpline1DInit(
                         (const double*)tableID->table, tableID->nRow,
