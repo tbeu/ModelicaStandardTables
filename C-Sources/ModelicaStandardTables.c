@@ -320,6 +320,7 @@ static void destroyLock(void) {
 #define RWLOCK_RDUNLOCK()
 #define RWLOCK_WRUNLOCK()
 #endif
+#else
 #define RWLOCK_RDLOCK()
 #define RWLOCK_WRLOCK()
 #define RWLOCK_RDUNLOCK()
