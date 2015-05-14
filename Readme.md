@@ -2,7 +2,9 @@
 C sources of the ModelicaStandardTables - Modelica library for reading
 data from Text or MATLAB MAT-files, interpolation and extrapolation.
 
-## Status
+The library was presented at the [10th International Modelica Conference] (https://modelica.org/events/modelica2014/proceedings/html/sessions/session_5E.html). Detailed remarks on the implementation can be found in the [article](http://dx.doi.org/10.3384/ecp14096839).
+
+## Build status
 [![Build Status](https://drone.io/github.com/tbeu/ModelicaStandardTables/status.png)](https://drone.io/github.com/tbeu/ModelicaStandardTables/latest)
 
 ## License
