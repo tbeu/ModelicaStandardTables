@@ -21,10 +21,6 @@
 
 
    Release Notes:
-      May 15, 2015:  by Thomas Beutlich, ITI GmbH.
-                     Guard multi-threaded access of common/shared table arrays by
-                     a read/write lock instead of a single mutex or critical section
-
       May 11, 2015:  by Thomas Beutlich, ITI GmbH.
                      Added univariate Fritsch-Butland-spline interpolation
                      (ticket #1717)
@@ -148,7 +144,7 @@ enum PointInterval {
 };
 
 enum TableSource {
-    TABLESOURCE_MODEL,
+    TABLESOURCE_MODEL = 1,
     TABLESOURCE_FILE,
     TABLESOURCE_FUNCTION,
     TABLESOURCE_FUNCTION_TRANSPOSE
@@ -274,110 +270,50 @@ static TableShare* tableShare = NULL;
 #if defined(_POSIX_)
 #include <pthread.h>
 #if defined(G_HAS_CONSTRUCTORS)
-static pthread_rwlock_t tableLock;
-
-G_DEFINE_CONSTRUCTOR(initializeLock)
-static void initializeLock(void) {
-    if (pthread_rwlock_init(&tableLock, NULL) != 0) {
-        ModelicaError("Initialization of lock failed\n");
+static pthread_mutex_t m;
+G_DEFINE_CONSTRUCTOR(initializeMutex)
+static void initializeMutex(void) {
+    if (pthread_mutex_init(&m, NULL) != 0) {
+        ModelicaError("Initialization of mutex failed\n");
     }
 }
-
-G_DEFINE_DESTRUCTOR(destroyLock)
-static void destroyLock(void) {
-    if (pthread_rwlock_destroy(&tableLock) != 0) {
-        ModelicaError("Destruction of lock failed\n");
+G_DEFINE_DESTRUCTOR(destroyMutex)
+static void destroyMutex(void) {
+    if (pthread_mutex_destroy(&m) != 0) {
+        ModelicaError("Destruction of mutex failed\n");
     }
 }
-
 #else
-static pthread_rwlock_t tableLock = PTHREAD_TABLE_INITIALIZER;
+static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
 #endif
-#define TABLE_RDLOCK() if (tableID->source == TABLESOURCE_FILE) pthread_rwlock_rdlock(&tableLock)
-#define TABLE_WRLOCK() pthread_rwlock_wrlock(&tableLock)
-#define TABLE_RDUNLOCK() if (tableID->source == TABLESOURCE_FILE) pthread_rwlock_unlock(&tableLock)
-#define TABLE_WRUNLOCK() pthread_rwlock_unlock(&tableLock)
+#define MUTEX_LOCK() pthread_mutex_lock(&m)
+#define MUTEX_UNLOCK() pthread_mutex_unlock(&m)
 #elif defined(_WIN32) && defined(G_HAS_CONSTRUCTORS)
 #if !defined(WIN32_LEAN_AND_MEAN)
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <Windows.h>
-
-typedef struct RW_LOCK {
-    CRITICAL_SECTION csReaderCount;
-    CRITICAL_SECTION csWrite;
-    HANDLE noReaders;
-    int readerCount;
-} RW_LOCK, *PRW_LOCK;
-
-static RW_LOCK tableLock;
-
+static CRITICAL_SECTION cs;
 #ifdef G_DEFINE_CONSTRUCTOR_NEEDS_PRAGMA
-#pragma G_DEFINE_CONSTRUCTOR_PRAGMA_ARGS(initializeLock)
+#pragma G_DEFINE_CONSTRUCTOR_PRAGMA_ARGS(initializeCS)
 #endif
-G_DEFINE_CONSTRUCTOR(initializeLock)
-static void initializeLock(void) {
-    InitializeCriticalSection(&tableLock.csReaderCount);
-    InitializeCriticalSection(&tableLock.csWrite);
-    tableLock.noReaders = CreateEvent(NULL, TRUE, TRUE, NULL);
-    tableLock.readerCount = 0;
+G_DEFINE_CONSTRUCTOR(initializeCS)
+static void initializeCS(void) {
+    InitializeCriticalSection(&cs);
 }
-
 #ifdef G_DEFINE_DESTRUCTOR_NEEDS_PRAGMA
-#pragma G_DEFINE_DESTRUCTOR_PRAGMA_ARGS(destroyLock)
+#pragma G_DEFINE_DESTRUCTOR_PRAGMA_ARGS(deleteCS)
 #endif
-G_DEFINE_DESTRUCTOR(destroyLock)
-static void destroyLock(void) {
-    WaitForSingleObject(tableLock.noReaders, INFINITE);
-    CloseHandle(tableLock.noReaders);
-    DeleteCriticalSection(&tableLock.csWrite);
-    DeleteCriticalSection(&tableLock.csReaderCount);
+G_DEFINE_DESTRUCTOR(deleteCS)
+static void deleteCS(void) {
+    DeleteCriticalSection(&cs);
 }
-
-static void rwlock_rdlock(PRW_LOCK rwlock) {
-    EnterCriticalSection(&rwlock->csWrite);
-    EnterCriticalSection(&rwlock->csReaderCount);
-    if (++rwlock->readerCount == 1) {
-        ResetEvent(rwlock->noReaders);
-    }
-    LeaveCriticalSection(&rwlock->csReaderCount);
-    LeaveCriticalSection(&rwlock->csWrite);
-}
-
-static void rwlock_wrlock(PRW_LOCK rwlock) {
-    EnterCriticalSection(&rwlock->csWrite);
-    if (rwlock->readerCount > 0) {
-        WaitForSingleObject(rwlock->noReaders, INFINITE);
-    }
-}
-
-static void rwlock_rdunlock(PRW_LOCK rwlock) {
-    EnterCriticalSection(&rwlock->csReaderCount);
-    if (--rwlock->readerCount == 0) {
-        SetEvent(rwlock->noReaders);
-    }
-    LeaveCriticalSection(&rwlock->csReaderCount);
-}
-
-static void rwlock_wrunlock(PRW_LOCK rwlock) {
-    LeaveCriticalSection(&rwlock->csWrite);
-}
-
-#define TABLE_RDLOCK() if (tableID->source == TABLESOURCE_FILE) rwlock_rdlock(&tableLock)
-#define TABLE_WRLOCK() rwlock_wrlock(&tableLock)
-#define TABLE_RDUNLOCK() if (tableID->source == TABLESOURCE_FILE) rwlock_rdunlock(&tableLock)
-#define TABLE_WRUNLOCK() rwlock_wrunlock(&tableLock)
+#define MUTEX_LOCK() EnterCriticalSection(&cs)
+#define MUTEX_UNLOCK() LeaveCriticalSection(&cs)
 #else
-#define TABLE_RDLOCK()
-#define TABLE_WRLOCK()
-#define TABLE_RDUNLOCK()
-#define TABLE_WRUNLOCK()
+#define MUTEX_LOCK()
+#define MUTEX_UNLOCK()
 #endif
-#else
-#define TABLE_RDLOCK()
-#define TABLE_WRLOCK()
-#define TABLE_RDUNLOCK()
-#define TABLE_WRUNLOCK()
 #endif
 
 /* ----- Function declarations ----- */
@@ -459,7 +395,7 @@ static double* readTxtTable(const char* tableName, const char* fileName,
 
 static int readLine(char** buf, int* bufLen, FILE* fp);
   /* Read line (of unknown and arbitrary length) from an ASCII text file */
-#endif
+#endif /* #if !defined(NO_FILE_SYSTEM) */
 
 static CubicHermite1D* fritschButlandSpline1DInit(const double* table,
                                                   size_t nRow, size_t nCol,
@@ -480,7 +416,7 @@ static CubicHermite1D* akimaSpline1DInit(const double* table, size_t nRow,
      <- RETURN: Pointer to array of coefficients
   */
 
-static void spline1DClose(CubicHermite1D* spline);
+static void spline1DClose(CubicHermite1D** spline);
   /* Free allocated memory of the 1D cubic Hermite spline coefficients */
 
 static CubicHermite2D* spline2DInit(const double* table, size_t nRow,
@@ -491,7 +427,7 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow,
      <- RETURN: Pointer to array of coefficients
   */
 
-static void spline2DClose(CubicHermite2D* spline);
+static void spline2DClose(CubicHermite2D** spline);
   /* Free allocated memory of the 2D cubic Hermite spline coefficients */
 
 /* ----- Interface functions ----- */
@@ -533,9 +469,8 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                         free(tableID->cols);
                     }
                     free(tableID);
-                    tableID = NULL;
                     ModelicaError("Memory allocation error\n");
-                    break;
+                    return NULL;
                 }
                 tableID->fileName = malloc((strlen(fileName) + 1)*sizeof(char));
                 if (tableID->fileName != NULL) {
@@ -547,8 +482,8 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                         free(tableID->cols);
                     }
                     free(tableID);
-                    tableID = NULL;
                     ModelicaError("Memory allocation error\n");
+                    return NULL;
                 }
                 break;
 
@@ -568,14 +503,30 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                         tableID->spline = akimaSpline1DInit(table,
                             tableID->nRow, tableID->nCol, (const int*)cols,
                             tableID->nCols);
+                        if (tableID->spline == NULL) {
+                            if (nCols > 0) {
+                                free(tableID->cols);
+                            }
+                            free(tableID);
+                            ModelicaError("Memory allocation error\n");
+                            return NULL;
+                        }
                     }
                     else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
                         /* Initialization of the cubic Hermite spline coefficients */
                         tableID->spline = fritschButlandSpline1DInit(table,
                             tableID->nRow, tableID->nCol, (const int*)cols,
                             tableID->nCols);
+                        if (tableID->spline == NULL) {
+                            if (nCols > 0) {
+                                free(tableID->cols);
+                            }
+                            free(tableID);
+                            ModelicaError("Memory allocation error\n");
+                            return NULL;
+                        }
                     }
-#ifndef NO_TABLE_COPY
+#if !defined(NO_TABLE_COPY)
                     tableID->table = malloc(
                         tableID->nRow*tableID->nCol*sizeof(double));
                     if (tableID->table != NULL) {
@@ -586,9 +537,10 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                         if (nCols > 0) {
                             free(tableID->cols);
                         }
+                        spline1DClose(&tableID->spline);
                         free(tableID);
-                        tableID = NULL;
                         ModelicaError("Memory allocation error\n");
+                        return NULL;
                     }
 #endif
                 }
@@ -622,9 +574,8 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                                 free(tableID->cols);
                             }
                             free(tableID);
-                            tableID = NULL;
                             ModelicaError("Memory allocation error\n");
-                            break;
+                            return NULL;
                         }
                     }
                     if (tableID->nRow == 2) {
@@ -639,12 +590,34 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                             tableID->spline = akimaSpline1DInit(table,
                                 tableID->nRow, tableID->nCol, (const int*)cols,
                                 tableID->nCols);
+                            if (tableID->spline == NULL) {
+                                if (nCols > 0) {
+                                    free(tableID->cols);
+                                }
+                                if (tableID->source == TABLESOURCE_FUNCTION_TRANSPOSE) {
+                                    free(tableID->table);
+                                }
+                                free(tableID);
+                                ModelicaError("Memory allocation error\n");
+                                return NULL;
+                            }
                         }
                         else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
                             /* Initialization of the cubic Hermite spline coefficients */
                             tableID->spline = fritschButlandSpline1DInit(table,
                                 tableID->nRow, tableID->nCol, (const int*)cols,
                                 tableID->nCols);
+                            if (tableID->spline == NULL) {
+                                if (nCols > 0) {
+                                    free(tableID->cols);
+                                }
+                                if (tableID->source == TABLESOURCE_FUNCTION_TRANSPOSE) {
+                                    free(tableID->table);
+                                }
+                                free(tableID);
+                                ModelicaError("Memory allocation error\n");
+                                return NULL;
+                            }
                         }
                     }
                 }
@@ -656,8 +629,12 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                 break;
 
             default:
+                if (nCols > 0) {
+                    free(tableID->cols);
+                }
+                free(tableID);
                 ModelicaError("Table source error\n");
-                break;
+                return NULL;
         }
     }
     else {
@@ -669,11 +646,9 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
 void ModelicaStandardTables_CombiTimeTable_close(void* _tableID) {
     CombiTimeTable* tableID = (CombiTimeTable*)_tableID;
     if (tableID != NULL) {
-        if (tableID->source == TABLESOURCE_FILE) {
+        if (tableID->table != NULL && tableID->source == TABLESOURCE_FILE) {
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
-            TABLE_WRLOCK();
-            if (tableID->table != NULL && tableID->tableName != NULL &&
-                tableID->fileName != NULL) {
+            if (tableID->tableName != NULL && tableID->fileName != NULL) {
                 char* key = malloc((strlen(tableID->tableName) +
                     strlen(tableID->fileName) + 2)*sizeof(char));
                 if (key != NULL) {
@@ -681,6 +656,7 @@ void ModelicaStandardTables_CombiTimeTable_close(void* _tableID) {
                     strcpy(key, tableID->tableName);
                     strcat(key, "|");
                     strcat(key, tableID->fileName);
+                    MUTEX_LOCK();
                     HASH_FIND_STR(tableShare, key, iter);
                     if (iter != NULL) {
                         /* Share hit */
@@ -691,23 +667,21 @@ void ModelicaStandardTables_CombiTimeTable_close(void* _tableID) {
                             free(iter);
                         }
                     }
+                    MUTEX_UNLOCK();
                     free(key);
                 }
             }
-            else if (tableID->table != NULL) {
+            else {
                 /* Should not be possible to get here */
                 free(tableID->table);
             }
-            TABLE_WRUNLOCK();
 #else
-            if (tableID->table != NULL) {
-                free(tableID->table);
-            }
+            free(tableID->table);
 #endif
             tableID->table = NULL;
         }
         else if (tableID->table != NULL && (
-#ifndef NO_TABLE_COPY
+#if !defined(NO_TABLE_COPY)
             tableID->source == TABLESOURCE_MODEL ||
 #endif
             tableID->source == TABLESOURCE_FUNCTION_TRANSPOSE)) {
@@ -730,7 +704,7 @@ void ModelicaStandardTables_CombiTimeTable_close(void* _tableID) {
             free(tableID->intervals);
             tableID->intervals = NULL;
         }
-        spline1DClose(tableID->spline);
+        spline1DClose(&tableID->spline);
         free(tableID);
         tableID = NULL;
     }
@@ -741,7 +715,6 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                                                       double preNextTimeEvent) {
     double y = 0.;
     CombiTimeTable* tableID = (CombiTimeTable*)_tableID;
-    TABLE_RDLOCK();
     if (tableID != NULL && tableID->table != NULL && tableID->cols != NULL) {
         /* Shift time by start time */
         const double tOld = t;
@@ -750,8 +723,7 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
         if (t >= 0 && nextTimeEvent < DBL_MAX &&
             nextTimeEvent == preNextTimeEvent &&
             tableID->startTime >= nextTimeEvent) {
-            /* Before start time event iteration: need to return zero */
-            TABLE_RDUNLOCK();
+            /* Before start time event iteration: Return zero */
             return 0.;
         }
         else if (t >= 0) {
@@ -787,7 +759,6 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                                 tableID->eventInterval - 1][1];
                         }
                         y = TABLE(i, col);
-                        TABLE_RDUNLOCK();
                         return y;
                     }
                     else if (nextTimeEvent > preNextTimeEvent &&
@@ -798,7 +769,6 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                         size_t i = tableID->intervals[
                             tableID->eventInterval - 1][0];
                         y = TABLE(i, col);
-                        TABLE_RDUNLOCK();
                         return y;
                     }
                     else {
@@ -877,7 +847,6 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                                     tableID->last, t);
                             }
                             y = TABLE(last, col);
-                            TABLE_RDUNLOCK();
                             return y;
                         }
                         else {
@@ -926,7 +895,7 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
 
                         case CONTINUOUS_DERIVATIVE:
                         case MONOTONE_CONTINUOUS_DERIVATIVE:
-                            if (tableID->spline) {
+                            if (tableID->spline != NULL) {
                                 const double* c = tableID->spline[
                                     IDX(last, iCol - 1, tableID->nCols)];
                                 t -= TABLE_COL0(last);
@@ -936,7 +905,6 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                             break;
 
                         default:
-                            TABLE_RDUNLOCK();
                             ModelicaError("Unknown smoothness kind\n");
                             return y;
                     }
@@ -945,7 +913,6 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                     /* Extrapolation */
                     switch (tableID->extrapolation) {
                         case NO_EXTRAPOLATION:
-                            TABLE_RDUNLOCK();
                             ModelicaError("Extrapolation error\n");
                             return y;
 
@@ -962,7 +929,7 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
 
                             if (tableID->smoothness == CONTINUOUS_DERIVATIVE ||
                                 tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                                if (tableID->spline) {
+                                if (tableID->spline != NULL) {
                                     const double* c = tableID->spline[
                                         IDX(last, iCol - 1, tableID->nCols)];
                                     if (extrapolate == LEFT) {
@@ -995,7 +962,6 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                             break;
 
                         default:
-                            TABLE_RDUNLOCK();
                             ModelicaError("Unknown extrapolation kind\n");
                             return y;
                     }
@@ -1003,7 +969,6 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
             }
         }
     }
-    TABLE_RDUNLOCK();
     return y;
 }
 
@@ -1014,7 +979,6 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
                                                          double der_t) {
     double der_y = 0.;
     CombiTimeTable* tableID = (CombiTimeTable*)_tableID;
-    TABLE_RDLOCK();
     if (tableID != NULL && tableID->table != NULL && tableID->cols != NULL) {
         /* Shift time by start time */
         const double tOld = t;
@@ -1023,8 +987,7 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
         if (t >= 0 && nextTimeEvent < DBL_MAX &&
             nextTimeEvent == preNextTimeEvent &&
             tableID->startTime >= nextTimeEvent) {
-            /* Before start time event iteration: need to return zero */
-            TABLE_RDUNLOCK();
+            /* Before start time event iteration: Return zero */
             return 0.;
         }
         else if (t >= 0) {
@@ -1179,7 +1142,7 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
 
                         case CONTINUOUS_DERIVATIVE:
                         case MONOTONE_CONTINUOUS_DERIVATIVE:
-                            if (tableID->spline) {
+                            if (tableID->spline != NULL) {
                                 const double* c = tableID->spline[
                                     IDX(last, iCol - 1, tableID->nCols)];
                                 t -= TABLE_COL0(last);
@@ -1189,7 +1152,6 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
                             break;
 
                         default:
-                            TABLE_RDUNLOCK();
                             ModelicaError("Unknown smoothness kind\n");
                             return der_y;
                     }
@@ -1198,7 +1160,6 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
                     /* Extrapolation */
                     switch (tableID->extrapolation) {
                         case NO_EXTRAPOLATION:
-                            TABLE_RDUNLOCK();
                             ModelicaError("Extrapolation error\n");
                             return der_y;
 
@@ -1240,7 +1201,6 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
                             break;
 
                         default:
-                            TABLE_RDUNLOCK();
                             ModelicaError("Unknown extrapolation kind\n");
                             return der_y;
                     }
@@ -1248,32 +1208,27 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
             }
         }
     }
-    TABLE_RDUNLOCK();
     return der_y;
 }
 
 double ModelicaStandardTables_CombiTimeTable_minimumTime(void* _tableID) {
     double tMin = 0.;
     CombiTimeTable* tableID = (CombiTimeTable*)_tableID;
-    TABLE_RDLOCK();
     if (tableID != NULL && tableID->table != NULL) {
         const double* table = tableID->table;
         tMin = TABLE_ROW0(0);
     }
-    TABLE_RDUNLOCK();
     return tMin;
 }
 
 double ModelicaStandardTables_CombiTimeTable_maximumTime(void* _tableID) {
     double tMax = 0.;
     CombiTimeTable* tableID = (CombiTimeTable*)_tableID;
-    TABLE_RDLOCK();
     if (tableID != NULL && tableID->table != NULL) {
         const double* table = tableID->table;
         const size_t nCol = tableID->nCol;
         tMax = TABLE_COL0(tableID->nRow - 1);
     }
-    TABLE_RDUNLOCK();
     return tMax;
 }
 
@@ -1281,7 +1236,6 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
                                                            double t) {
     double nextTimeEvent = DBL_MAX;
     CombiTimeTable* tableID = (CombiTimeTable*)_tableID;
-    TABLE_RDLOCK();
     if (tableID != NULL && tableID->table != NULL) {
         const double* table = tableID->table;
         const size_t nRow = tableID->nRow;
@@ -1292,7 +1246,6 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
                 tableID->preNextTimeEventCalled = t;
             }
             else {
-                TABLE_RDUNLOCK();
                 return tableID->preNextTimeEvent;
             }
         }
@@ -1325,7 +1278,6 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
             tableID->intervals = calloc(tableID->maxEvents,
                 sizeof(Interval));
             if (tableID->intervals == NULL) {
-                TABLE_RDUNLOCK();
                 ModelicaError("Memory allocation error\n");
                 return nextTimeEvent;
             }
@@ -1523,8 +1475,9 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
         /* Should not be possible to get here */
         ModelicaError(
             "No table data available for detection of time events\n");
+        return nextTimeEvent;
     }
-    TABLE_RDUNLOCK();
+
     return nextTimeEvent;
 }
 
@@ -1532,42 +1485,48 @@ double ModelicaStandardTables_CombiTimeTable_read(void* _tableID, int force,
                                                   int verbose) {
 #if !defined(NO_FILE_SYSTEM)
     CombiTimeTable* tableID = (CombiTimeTable*)_tableID;
-    if (tableID != NULL) {
-        if (tableID->source == TABLESOURCE_FILE) {
-            if (force || !tableID->table) {
+    if (tableID != NULL && tableID->source == TABLESOURCE_FILE) {
+        if (force || tableID->table == NULL) {
 #if !defined(TABLE_SHARE)
-                if (tableID->table != NULL) {
-                    free(tableID->table);
-                }
+            if (tableID->table != NULL) {
+                free(tableID->table);
+            }
 #endif
-                tableID->table = readTable(tableID->tableName,
-                    tableID->fileName, &tableID->nRow, &tableID->nCol,
-                    verbose, force);
-                if (tableID->table == NULL) {
+            tableID->table = readTable(tableID->tableName,
+                tableID->fileName, &tableID->nRow, &tableID->nCol,
+                verbose, force);
+            if (tableID->table == NULL) {
+                return 0.; /* Error */
+            }
+            if (tableID->nRow == 2) {
+                if (tableID->smoothness == CONTINUOUS_DERIVATIVE ||
+                    tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
+                    tableID->smoothness = LINEAR_SEGMENTS;
+                }
+            }
+            if (!isValidCombiTimeTable((const CombiTimeTable*)tableID)) {
+                return 0.; /* Error */
+            }
+            if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
+                /* Reinitialization of the cubic Hermite spline coefficients */
+                spline1DClose(&tableID->spline);
+                tableID->spline = akimaSpline1DInit(
+                    (const double*)tableID->table, tableID->nRow,
+                    tableID->nCol, (const int*)tableID->cols, tableID->nCols);
+                if (tableID->spline == NULL) {
+                    ModelicaError("Memory allocation error\n");
                     return 0.; /* Error */
                 }
-                if (tableID->nRow == 2) {
-                    if (tableID->smoothness == CONTINUOUS_DERIVATIVE ||
-                        tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                        tableID->smoothness = LINEAR_SEGMENTS;
-                    }
-                }
-                if (!isValidCombiTimeTable((const CombiTimeTable*)tableID)) {
+            }
+            else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
+                /* Reinitialization of the cubic Hermite spline coefficients */
+                spline1DClose(&tableID->spline);
+                tableID->spline = fritschButlandSpline1DInit(
+                    (const double*)tableID->table, tableID->nRow,
+                    tableID->nCol, (const int*)tableID->cols, tableID->nCols);
+                if (tableID->spline == NULL) {
+                    ModelicaError("Memory allocation error\n");
                     return 0.; /* Error */
-                }
-                if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                    /* Reinitialization of the cubic Hermite spline coefficients */
-                    spline1DClose(tableID->spline);
-                    tableID->spline = akimaSpline1DInit(
-                        (const double*)tableID->table, tableID->nRow,
-                        tableID->nCol, (const int*)tableID->cols, tableID->nCols);
-                }
-                else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                    /* Reinitialization of the cubic Hermite spline coefficients */
-                    spline1DClose(tableID->spline);
-                    tableID->spline = fritschButlandSpline1DInit(
-                        (const double*)tableID->table, tableID->nRow,
-                        tableID->nCol, (const int*)tableID->cols, tableID->nCols);
                 }
             }
         }
@@ -1610,9 +1569,8 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                         free(tableID->cols);
                     }
                     free(tableID);
-                    tableID = NULL;
                     ModelicaError("Memory allocation error\n");
-                    break;
+                    return NULL;
                 }
                 tableID->fileName = malloc(
                     (strlen(fileName) + 1)*sizeof(char));
@@ -1625,8 +1583,8 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                         free(tableID->cols);
                     }
                     free(tableID);
-                    tableID = NULL;
                     ModelicaError("Memory allocation error\n");
+                    return NULL;
                 }
                 break;
 
@@ -1646,14 +1604,30 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                         tableID->spline = akimaSpline1DInit(table,
                             tableID->nRow, tableID->nCol, (const int*)cols,
                             tableID->nCols);
+                        if (tableID->spline == NULL) {
+                            if (nCols > 0) {
+                                free(tableID->cols);
+                            }
+                            free(tableID);
+                            ModelicaError("Memory allocation error\n");
+                            return NULL;
+                        }
                     }
                     else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
                         /* Initialization of the cubic Hermite spline coefficients */
                         tableID->spline = fritschButlandSpline1DInit(table,
                             tableID->nRow, tableID->nCol, (const int*)cols,
                             tableID->nCols);
+                        if (tableID->spline == NULL) {
+                            if (nCols > 0) {
+                                free(tableID->cols);
+                            }
+                            free(tableID);
+                            ModelicaError("Memory allocation error\n");
+                            return NULL;
+                        }
                     }
-#ifndef NO_TABLE_COPY
+#if !defined(NO_TABLE_COPY)
                     tableID->table = malloc(
                         tableID->nRow*tableID->nCol*sizeof(double));
                     if (tableID->table != NULL) {
@@ -1664,9 +1638,10 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                         if (nCols > 0) {
                             free(tableID->cols);
                         }
+                        spline1DClose(&tableID->spline);
                         free(tableID);
-                        tableID = NULL;
                         ModelicaError("Memory allocation error\n");
+                        return NULL;
                     }
 #endif
                 }
@@ -1700,9 +1675,8 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                                 free(tableID->cols);
                             }
                             free(tableID);
-                            tableID = NULL;
                             ModelicaError("Memory allocation error\n");
-                            break;
+                            return NULL;
                         }
                     }
                     if (tableID->nRow == 2) {
@@ -1717,12 +1691,34 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                             tableID->spline = akimaSpline1DInit(table,
                                 tableID->nRow, tableID->nCol, (const int*)cols,
                                 tableID->nCols);
+                            if (tableID->spline == NULL) {
+                                if (nCols > 0) {
+                                    free(tableID->cols);
+                                }
+                                if (tableID->source == TABLESOURCE_FUNCTION_TRANSPOSE) {
+                                    free(tableID->table);
+                                }
+                                free(tableID);
+                                ModelicaError("Memory allocation error\n");
+                                return NULL;
+                            }
                         }
                         else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
                             /* Initialization of the cubic Hermite spline coefficients */
                             tableID->spline = fritschButlandSpline1DInit(table,
                                 tableID->nRow, tableID->nCol, (const int*)cols,
                                 tableID->nCols);
+                            if (tableID->spline == NULL) {
+                                if (nCols > 0) {
+                                    free(tableID->cols);
+                                }
+                                if (tableID->source == TABLESOURCE_FUNCTION_TRANSPOSE) {
+                                    free(tableID->table);
+                                }
+                                free(tableID);
+                                ModelicaError("Memory allocation error\n");
+                                return NULL;
+                            }
                         }
                     }
                 }
@@ -1734,8 +1730,12 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                 break;
 
             default:
+                if (nCols > 0) {
+                    free(tableID->cols);
+                }
+                free(tableID);
                 ModelicaError("Table source error\n");
-                break;
+                return NULL;
         }
     }
     else {
@@ -1747,11 +1747,9 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
 void ModelicaStandardTables_CombiTable1D_close(void* _tableID) {
     CombiTable1D* tableID = (CombiTable1D*)_tableID;
     if (tableID != NULL) {
-        if (tableID->source == TABLESOURCE_FILE) {
+        if (tableID->table != NULL && tableID->source == TABLESOURCE_FILE) {
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
-            TABLE_WRLOCK();
-            if (tableID->table != NULL && tableID->tableName != NULL &&
-                tableID->fileName != NULL) {
+            if (tableID->tableName != NULL && tableID->fileName != NULL) {
                 char* key = malloc((strlen(tableID->tableName) +
                     strlen(tableID->fileName) + 2)*sizeof(char));
                 if (key != NULL) {
@@ -1759,6 +1757,7 @@ void ModelicaStandardTables_CombiTable1D_close(void* _tableID) {
                     strcpy(key, tableID->tableName);
                     strcat(key, "|");
                     strcat(key, tableID->fileName);
+                    MUTEX_LOCK();
                     HASH_FIND_STR(tableShare, key, iter);
                     if (iter != NULL) {
                         /* Share hit */
@@ -1769,23 +1768,21 @@ void ModelicaStandardTables_CombiTable1D_close(void* _tableID) {
                             free(iter);
                         }
                     }
+                    MUTEX_UNLOCK();
                     free(key);
                 }
             }
-            else if (tableID->table != NULL) {
+            else {
                 /* Should not be possible to get here */
                 free(tableID->table);
             }
-            TABLE_WRUNLOCK();
 #else
-            if (tableID->table != NULL) {
-                free(tableID->table);
-            }
+            free(tableID->table);
 #endif
             tableID->table = NULL;
         }
         else if (tableID->table != NULL && (
-#ifndef NO_TABLE_COPY
+#if !defined(NO_TABLE_COPY)
             tableID->source == TABLESOURCE_MODEL ||
 #endif
             tableID->source == TABLESOURCE_FUNCTION_TRANSPOSE)) {
@@ -1804,7 +1801,7 @@ void ModelicaStandardTables_CombiTable1D_close(void* _tableID) {
             free(tableID->fileName);
             tableID->fileName = NULL;
         }
-        spline1DClose(tableID->spline);
+        spline1DClose(&tableID->spline);
         free(tableID);
         tableID = NULL;
     }
@@ -1814,8 +1811,7 @@ double ModelicaStandardTables_CombiTable1D_getValue(void* _tableID, int iCol,
                                                     double u) {
     double y = 0.;
     CombiTable1D* tableID = (CombiTable1D*)_tableID;
-    TABLE_RDLOCK();
-    if (tableID && tableID->table && tableID->cols) {
+    if (tableID != NULL && tableID->table != NULL && tableID->cols != NULL) {
         const double* table = tableID->table;
         const size_t nRow = tableID->nRow;
         const size_t nCol = tableID->nCol;
@@ -1863,7 +1859,7 @@ double ModelicaStandardTables_CombiTable1D_getValue(void* _tableID, int iCol,
 
                 case CONTINUOUS_DERIVATIVE:
                 case MONOTONE_CONTINUOUS_DERIVATIVE:
-                    if (tableID->spline) {
+                    if (tableID->spline != NULL) {
                         const double* c = tableID->spline[
                             IDX(last, iCol - 1, tableID->nCols)];
                         const double u0 = TABLE_COL0(last);
@@ -1885,13 +1881,11 @@ double ModelicaStandardTables_CombiTable1D_getValue(void* _tableID, int iCol,
                     break;
 
                 default:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Unknown smoothness kind\n");
                     return y;
             }
         }
     }
-    TABLE_RDUNLOCK();
     return y;
 }
 
@@ -1899,8 +1893,7 @@ double ModelicaStandardTables_CombiTable1D_getDerValue(void* _tableID, int iCol,
                                                        double u, double der_u) {
     double der_y = 0.;
     CombiTable1D* tableID = (CombiTable1D*)_tableID;
-    TABLE_RDLOCK();
-    if (tableID && tableID->table && tableID->cols) {
+    if (tableID != NULL && tableID->table != NULL && tableID->cols != NULL) {
         const double* table = tableID->table;
         const size_t nRow = tableID->nRow;
         const size_t nCol = tableID->nCol;
@@ -1937,7 +1930,7 @@ double ModelicaStandardTables_CombiTable1D_getDerValue(void* _tableID, int iCol,
 
                 case CONTINUOUS_DERIVATIVE:
                 case MONOTONE_CONTINUOUS_DERIVATIVE:
-                    if (tableID->spline) {
+                    if (tableID->spline != NULL) {
                         const double* c = tableID->spline[
                             IDX(last, iCol - 1, tableID->nCols)];
                         if (extrapolate == IN_TABLE) {
@@ -1957,13 +1950,11 @@ double ModelicaStandardTables_CombiTable1D_getDerValue(void* _tableID, int iCol,
                     break;
 
                 default:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Unknown smoothness kind\n");
                     return der_y;
             }
         }
     }
-    TABLE_RDUNLOCK();
     return der_y;
 }
 
@@ -1971,42 +1962,48 @@ double ModelicaStandardTables_CombiTable1D_read(void* _tableID, int force,
                                                 int verbose) {
 #if !defined(NO_FILE_SYSTEM)
     CombiTable1D* tableID = (CombiTable1D*)_tableID;
-    if (tableID != NULL) {
-        if (tableID->source == TABLESOURCE_FILE) {
-            if (force || !tableID->table) {
+    if (tableID != NULL && tableID->source == TABLESOURCE_FILE) {
+        if (force || tableID->table == NULL) {
 #if !defined(TABLE_SHARE)
-                if (tableID->table != NULL) {
-                    free(tableID->table);
-                }
+            if (tableID->table != NULL) {
+                free(tableID->table);
+            }
 #endif
-                tableID->table = readTable(tableID->tableName,
-                    tableID->fileName, &tableID->nRow, &tableID->nCol,
-                    verbose, force);
-                if (tableID->table == NULL) {
+            tableID->table = readTable(tableID->tableName,
+                tableID->fileName, &tableID->nRow, &tableID->nCol,
+                verbose, force);
+            if (tableID->table == NULL) {
+                return 0.; /* Error */
+            }
+            if (tableID->nRow == 2) {
+                if (tableID->smoothness == CONTINUOUS_DERIVATIVE ||
+                    tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
+                    tableID->smoothness = LINEAR_SEGMENTS;
+                }
+            }
+            if (!isValidCombiTable1D((const CombiTable1D*)tableID)) {
+                return 0.; /* Error */
+            }
+            if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
+                /* Reinitialization of the cubic Hermite spline coefficients */
+                spline1DClose(&tableID->spline);
+                tableID->spline = akimaSpline1DInit(
+                    (const double*)tableID->table, tableID->nRow,
+                    tableID->nCol, (const int*)tableID->cols, tableID->nCols);
+                if (tableID->spline == NULL) {
+                    ModelicaError("Memory allocation error\n");
                     return 0.; /* Error */
                 }
-                if (tableID->nRow == 2) {
-                    if (tableID->smoothness == CONTINUOUS_DERIVATIVE ||
-                        tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                        tableID->smoothness = LINEAR_SEGMENTS;
-                    }
-                }
-                if (!isValidCombiTable1D((const CombiTable1D*)tableID)) {
+            }
+            else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
+                /* Reinitialization of the cubic Hermite spline coefficients */
+                spline1DClose(&tableID->spline);
+                tableID->spline = fritschButlandSpline1DInit(
+                    (const double*)tableID->table, tableID->nRow,
+                    tableID->nCol, (const int*)tableID->cols, tableID->nCols);
+                if (tableID->spline == NULL) {
+                    ModelicaError("Memory allocation error\n");
                     return 0.; /* Error */
-                }
-                if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                    /* Reinitialization of the cubic Hermite spline coefficients */
-                    spline1DClose(tableID->spline);
-                    tableID->spline = akimaSpline1DInit(
-                        (const double*)tableID->table, tableID->nRow,
-                        tableID->nCol, (const int*)tableID->cols, tableID->nCols);
-                }
-                else if (tableID->smoothness == MONOTONE_CONTINUOUS_DERIVATIVE) {
-                    /* Reinitialization of the cubic Hermite spline coefficients */
-                    spline1DClose(tableID->spline);
-                    tableID->spline = fritschButlandSpline1DInit(
-                        (const double*)tableID->table, tableID->nRow,
-                        tableID->nCol, (const int*)tableID->cols, tableID->nCols);
                 }
             }
         }
@@ -2033,9 +2030,8 @@ void* ModelicaStandardTables_CombiTable2D_init(const char* tableName,
                 }
                 else {
                     free(tableID);
-                    tableID = NULL;
                     ModelicaError("Memory allocation error\n");
-                    break;
+                    return NULL;
                 }
                 tableID->fileName = malloc((strlen(fileName) + 1)*sizeof(char));
                 if (tableID->fileName != NULL) {
@@ -2044,8 +2040,8 @@ void* ModelicaStandardTables_CombiTable2D_init(const char* tableName,
                 else {
                     free(tableID->tableName);
                     free(tableID);
-                    tableID = NULL;
                     ModelicaError("Memory allocation error\n");
+                    return NULL;
                 }
                 break;
 
@@ -2062,8 +2058,13 @@ void* ModelicaStandardTables_CombiTable2D_init(const char* tableName,
                         /* Initialization of the Akima-spline coefficients */
                         tableID->spline = spline2DInit(table, tableID->nRow,
                             tableID->nCol);
+                        if (tableID->spline = NULL) {
+                            free(tableID);
+                            ModelicaError("Memory allocation error\n");
+                            return NULL;
+                        }
                     }
-#ifndef NO_TABLE_COPY
+#if !defined(NO_TABLE_COPY)
                     tableID->table = malloc(
                         tableID->nRow*tableID->nCol*sizeof(double));
                     if (tableID->table != NULL) {
@@ -2071,9 +2072,10 @@ void* ModelicaStandardTables_CombiTable2D_init(const char* tableName,
                             tableID->nCol*sizeof(double));
                     }
                     else {
+                        spline2DClose(&tableID->spline);
                         free(tableID);
-                        tableID = NULL;
                         ModelicaError("Memory allocation error\n");
+                        return NULL;
                     }
 #endif
                 }
@@ -2104,9 +2106,8 @@ void* ModelicaStandardTables_CombiTable2D_init(const char* tableName,
                         }
                         else {
                             free(tableID);
-                            tableID = NULL;
                             ModelicaError("Memory allocation error\n");
-                            break;
+                            return NULL;
                         }
                     }
                     if (tableID->smoothness == CONTINUOUS_DERIVATIVE &&
@@ -2118,6 +2119,14 @@ void* ModelicaStandardTables_CombiTable2D_init(const char* tableName,
                             /* Initialization of the Akima-spline coefficients */
                             tableID->spline = spline2DInit(tableID->table,
                                 tableID->nRow, tableID->nCol);
+                            if (tableID->spline = NULL) {
+                                if (tableID->source == TABLESOURCE_FUNCTION_TRANSPOSE) {
+                                    free(tableID->table);
+                                }
+                                free(tableID);
+                                ModelicaError("Memory allocation error\n");
+                                return NULL;
+                            }
                         }
                     }
                 }
@@ -2129,8 +2138,9 @@ void* ModelicaStandardTables_CombiTable2D_init(const char* tableName,
                 break;
 
             default:
+                free(tableID);
                 ModelicaError("Table source error\n");
-                break;
+                return NULL;
         }
     }
     else {
@@ -2142,11 +2152,9 @@ void* ModelicaStandardTables_CombiTable2D_init(const char* tableName,
 void ModelicaStandardTables_CombiTable2D_close(void* _tableID) {
     CombiTable2D* tableID = (CombiTable2D*)_tableID;
     if (tableID != NULL) {
-        if (tableID->source == TABLESOURCE_FILE) {
+        if (tableID->table != NULL && tableID->source == TABLESOURCE_FILE) {
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
-            TABLE_WRLOCK();
-            if (tableID->table != NULL && tableID->tableName != NULL &&
-                tableID->fileName != NULL) {
+            if (tableID->tableName != NULL && tableID->fileName != NULL) {
                 char* key = malloc((strlen(tableID->tableName) +
                     strlen(tableID->fileName) + 2)*sizeof(char));
                 if (key != NULL) {
@@ -2154,6 +2162,7 @@ void ModelicaStandardTables_CombiTable2D_close(void* _tableID) {
                     strcpy(key, tableID->tableName);
                     strcat(key, "|");
                     strcat(key, tableID->fileName);
+                    MUTEX_LOCK();
                     HASH_FIND_STR(tableShare, key, iter);
                     if (iter != NULL) {
                         /* Share hit */
@@ -2164,23 +2173,21 @@ void ModelicaStandardTables_CombiTable2D_close(void* _tableID) {
                             free(iter);
                         }
                     }
+                    MUTEX_UNLOCK();
                     free(key);
                 }
             }
-            else if (tableID->table != NULL) {
+            else {
                 /* Should not be possible to get here */
                 free(tableID->table);
             }
-            TABLE_WRUNLOCK();
 #else
-            if (tableID->table != NULL) {
-                free(tableID->table);
-            }
+            free(tableID->table);
 #endif
             tableID->table = NULL;
         }
         else if (tableID->table != NULL && (
-#ifndef NO_TABLE_COPY
+#if !defined(NO_TABLE_COPY)
             tableID->source == TABLESOURCE_MODEL ||
 #endif
             tableID->source == TABLESOURCE_FUNCTION_TRANSPOSE)) {
@@ -2195,7 +2202,7 @@ void ModelicaStandardTables_CombiTable2D_close(void* _tableID) {
             free(tableID->fileName);
             tableID->fileName = NULL;
         }
-        spline2DClose(tableID->spline);
+        spline2DClose(&tableID->spline);
         free(tableID);
         tableID = NULL;
     }
@@ -2205,32 +2212,34 @@ double ModelicaStandardTables_CombiTable2D_read(void* _tableID, int force,
                                                 int verbose) {
 #if !defined(NO_FILE_SYSTEM)
     CombiTable2D* tableID = (CombiTable2D*)_tableID;
-    if (tableID != NULL) {
-        if (tableID->source == TABLESOURCE_FILE) {
-            if (force || !tableID->table) {
+    if (tableID != NULL && tableID->source == TABLESOURCE_FILE) {
+        if (force || tableID->table == NULL) {
 #if !defined(TABLE_SHARE)
-                if (tableID->table != NULL) {
-                    free(tableID->table);
-                }
+            if (tableID->table != NULL) {
+                free(tableID->table);
+            }
 #endif
-                tableID->table = readTable(tableID->tableName,
-                    tableID->fileName, &tableID->nRow, &tableID->nCol,
-                    verbose, force);
-                if (tableID->table == NULL) {
+            tableID->table = readTable(tableID->tableName,
+                tableID->fileName, &tableID->nRow, &tableID->nCol,
+                verbose, force);
+            if (tableID->table == NULL) {
+                return 0.; /* Error */
+            }
+            if (tableID->smoothness == CONTINUOUS_DERIVATIVE &&
+                tableID->nRow == 3 && tableID->nCol == 3) {
+                tableID->smoothness = LINEAR_SEGMENTS;
+            }
+            if (!isValidCombiTable2D((const CombiTable2D*)tableID)) {
+                return 0.; /* Error */
+            }
+            if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
+                /* Reinitialization of the Akima-spline coefficients */
+                spline2DClose(&tableID->spline);
+                tableID->spline = spline2DInit(tableID->table, tableID->nRow,
+                    tableID->nCol);
+                if (tableID->spline == NULL) {
+                    ModelicaError("Memory allocation error\n");
                     return 0.; /* Error */
-                }
-                if (tableID->smoothness == CONTINUOUS_DERIVATIVE &&
-                    tableID->nRow == 3 && tableID->nCol == 3) {
-                    tableID->smoothness = LINEAR_SEGMENTS;
-                }
-                if (!isValidCombiTable2D((const CombiTable2D*)tableID)) {
-                    return 0.; /* Error */
-                }
-                if (tableID->smoothness == CONTINUOUS_DERIVATIVE) {
-                    /* Reinitialization of the Akima-spline coefficients */
-                    spline2DClose(tableID->spline);
-                    tableID->spline = spline2DInit(tableID->table, tableID->nRow,
-                        tableID->nCol);
                 }
             }
         }
@@ -2243,8 +2252,7 @@ double ModelicaStandardTables_CombiTable2D_getValue(void* _tableID, double u1,
                                                     double u2) {
     double y = 0;
     CombiTable2D* tableID = (CombiTable2D*)_tableID;
-    TABLE_RDLOCK();
-    if (tableID && tableID->table) {
+    if (tableID != NULL && tableID->table != NULL) {
         const double* table = tableID->table;
         const size_t nRow = tableID->nRow;
         const size_t nCol = tableID->nCol;
@@ -2291,7 +2299,7 @@ double ModelicaStandardTables_CombiTable2D_getValue(void* _tableID, double u1,
                 }
 
                 case CONTINUOUS_DERIVATIVE:
-                    if (tableID->spline) {
+                    if (tableID->spline != NULL) {
                         const double* c = tableID->spline[last2];
                         const double u20 = TABLE_ROW0(last2 + 1);
                         if (extrapolate2 == IN_TABLE) {
@@ -2313,13 +2321,11 @@ double ModelicaStandardTables_CombiTable2D_getValue(void* _tableID, double u1,
                     break;
 
                 case MONOTONE_CONTINUOUS_DERIVATIVE:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Bivariate monotone interpolation is "
                         "not implemented\n");
                     return y;
 
                 default:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Unknown smoothness kind\n");
                     return y;
             }
@@ -2362,7 +2368,7 @@ double ModelicaStandardTables_CombiTable2D_getValue(void* _tableID, double u1,
                 }
 
                 case CONTINUOUS_DERIVATIVE:
-                    if (tableID->spline) {
+                    if (tableID->spline != NULL) {
                         const double* c = tableID->spline[last1];
                         const double u10 = TABLE_COL0(last1 + 1);
                         if (extrapolate1 == IN_TABLE) {
@@ -2384,13 +2390,11 @@ double ModelicaStandardTables_CombiTable2D_getValue(void* _tableID, double u1,
                     break;
 
                 case MONOTONE_CONTINUOUS_DERIVATIVE:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Bivariate monotone interpolation is "
                         "not implemented\n");
                     return y;
 
                 default:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Unknown smoothness kind\n");
                     return y;
             }
@@ -2456,7 +2460,7 @@ double ModelicaStandardTables_CombiTable2D_getValue(void* _tableID, double u1,
                 }
 
                 case CONTINUOUS_DERIVATIVE:
-                    if (tableID->spline) {
+                    if (tableID->spline != NULL) {
                         const double* c = tableID->spline[
                             IDX(last1, last2, nCol - 2)];
                         if (extrapolate1 == IN_TABLE) {
@@ -2580,19 +2584,16 @@ double ModelicaStandardTables_CombiTable2D_getValue(void* _tableID, double u1,
                     break;
 
                 case MONOTONE_CONTINUOUS_DERIVATIVE:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Bivariate monotone interpolation is "
                         "not implemented\n");
                     return y;
 
                 default:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Unknown smoothness kind\n");
                     return y;
             }
         }
     }
-    TABLE_RDUNLOCK();
     return y;
 }
 
@@ -2601,8 +2602,7 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
                                                        double der_u2) {
     double der_y = 0;
     CombiTable2D* tableID = (CombiTable2D*)_tableID;
-    TABLE_RDLOCK();
-    if (tableID && tableID->table) {
+    if (tableID != NULL && tableID->table != NULL) {
         const double* table = tableID->table;
         const size_t nRow = tableID->nRow;
         const size_t nCol = tableID->nCol;
@@ -2641,7 +2641,7 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
                 }
 
                 case CONTINUOUS_DERIVATIVE:
-                    if (tableID->spline) {
+                    if (tableID->spline != NULL) {
                         const double* c = tableID->spline[last2];
                         const double u20 = TABLE_ROW0(last2 + 1);
                         if (extrapolate2 == IN_TABLE) {
@@ -2661,13 +2661,11 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
                     break;
 
                 case MONOTONE_CONTINUOUS_DERIVATIVE:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Bivariate monotone interpolation is "
                         "not implemented\n");
                     return der_y;
 
                 default:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Unknown smoothness kind\n");
                     return der_y;
             }
@@ -2704,7 +2702,7 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
                 }
 
                 case CONTINUOUS_DERIVATIVE:
-                    if (tableID->spline) {
+                    if (tableID->spline != NULL) {
                         const double* c = tableID->spline[last1];
                         const double u10 = TABLE_COL0(last1 + 1);
                         if (extrapolate1 == IN_TABLE) {
@@ -2724,13 +2722,11 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
                     break;
 
                 case MONOTONE_CONTINUOUS_DERIVATIVE:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Bivariate monotone interpolation is "
                         "not implemented\n");
                     return der_y;
 
                 default:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Unknown smoothness kind\n");
                     return der_y;
             }
@@ -2792,7 +2788,7 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
                 }
 
                 case CONTINUOUS_DERIVATIVE:
-                    if (tableID->spline) {
+                    if (tableID->spline != NULL) {
                         const double* c = tableID->spline[
                             IDX(last1, last2, nCol - 2)];
                         if (extrapolate1 == IN_TABLE) {
@@ -2923,19 +2919,16 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
                     break;
 
                 case MONOTONE_CONTINUOUS_DERIVATIVE:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Bivariate monotone interpolation is "
                         "not implemented\n");
                     return der_y;
 
                 default:
-                    TABLE_RDUNLOCK();
                     ModelicaError("Unknown smoothness kind\n");
                     return der_y;
             }
         }
     }
-    TABLE_RDUNLOCK();
     return der_y;
 }
 
@@ -3050,7 +3043,6 @@ static int isValidCombiTimeTable(const CombiTimeTable* tableID) {
             return isValid;
         }
 
-        TABLE_RDLOCK();
         if (tableID->table != NULL && nRow > 1) {
             const double* table = tableID->table;
             /* Check period */
@@ -3059,7 +3051,6 @@ static int isValidCombiTimeTable(const CombiTimeTable* tableID) {
                 const double tMax = TABLE_COL0(nRow - 1);
                 const double T = tMax - tMin;
                 if (T <= 0) {
-                    TABLE_RDUNLOCK();
                     ModelicaFormatError(
                         "Table matrix \"%s\" does not have a positive period/cylce "
                         "time for time interpolation with periodic "
@@ -3078,7 +3069,6 @@ static int isValidCombiTimeTable(const CombiTimeTable* tableID) {
                     double t0 = TABLE_COL0(i);
                     double t1 = TABLE_COL0(i + 1);
                     if (t0 >= t1) {
-                        TABLE_RDUNLOCK();
                         ModelicaFormatError(
                             "The values of the first column of table \"%s(%lu,%lu)\" "
                             "are not strictly increasing because %s(%lu,1) (=%lf) "
@@ -3096,7 +3086,6 @@ static int isValidCombiTimeTable(const CombiTimeTable* tableID) {
                     double t0 = TABLE_COL0(i);
                     double t1 = TABLE_COL0(i + 1);
                     if (t0 > t1) {
-                        TABLE_RDUNLOCK();
                         ModelicaFormatError(
                             "The values of the first column of table \"%s(%lu,%lu)\" "
                             "are not monotonically increasing because %s(%lu,1) "
@@ -3111,7 +3100,7 @@ static int isValidCombiTimeTable(const CombiTimeTable* tableID) {
             }
         }
     }
-    TABLE_RDUNLOCK();
+
     return isValid;
 }
 
@@ -3140,7 +3129,6 @@ static int isValidCombiTable1D(const CombiTable1D* tableID) {
             return isValid;
         }
 
-        TABLE_RDLOCK();
         if (tableID->table != NULL) {
             const double* table = tableID->table;
             size_t i;
@@ -3149,7 +3137,6 @@ static int isValidCombiTable1D(const CombiTable1D* tableID) {
                 double x0 = TABLE_COL0(i);
                 double x1 = TABLE_COL0(i + 1);
                 if (x0 >= x1) {
-                    TABLE_RDUNLOCK();
                     ModelicaFormatError(
                         "The values of the first column of table \"%s(%lu,%lu)\" are "
                         "not strictly increasing because %s(%lu,1) (=%lf) >= "
@@ -3162,7 +3149,7 @@ static int isValidCombiTable1D(const CombiTable1D* tableID) {
             }
         }
     }
-    TABLE_RDUNLOCK();
+
     return isValid;
 }
 
@@ -3191,7 +3178,6 @@ static int isValidCombiTable2D(const CombiTable2D* tableID) {
             return isValid;
         }
 
-        TABLE_RDLOCK();
         if (tableID->table != NULL) {
             const double* table = tableID->table;
             size_t i;
@@ -3200,7 +3186,6 @@ static int isValidCombiTable2D(const CombiTable2D* tableID) {
                 double x0 = TABLE_COL0(i);
                 double x1 = TABLE_COL0(i + 1);
                 if (x0 >= x1) {
-                    TABLE_RDUNLOCK();
                     ModelicaFormatError(
                         "The values of the first column of table \"%s(%lu,%lu)\" are "
                         "not strictly increasing because %s(%lu,1) (=%lf) >= "
@@ -3217,7 +3202,6 @@ static int isValidCombiTable2D(const CombiTable2D* tableID) {
                 double y0 = TABLE_ROW0(i);
                 double y1 = TABLE_ROW0(i + 1);
                 if (y0 >= y1) {
-                    TABLE_RDUNLOCK();
                     ModelicaFormatError(
                         "The values of the first row of table \"%s(%lu,%lu)\" are "
                         "not strictly increasing because %s(1,%lu) (=%lf) >= "
@@ -3230,7 +3214,7 @@ static int isValidCombiTable2D(const CombiTable2D* tableID) {
             }
         }
     }
-    TABLE_RDUNLOCK();
+
     return isValid;
 }
 
@@ -3276,7 +3260,7 @@ static CubicHermite1D* akimaSpline1DInit(const double* table, size_t nRow,
                                          size_t nCols) {
   /* Reference:
 
-     Akima, Hiroshi. A new method of interpolation and smooth curve fitting
+     Hiroshi Akima. A new method of interpolation and smooth curve fitting
      based on local procedures. Journal of the ACM, 17(4), 589-602, Oct. 1970.
      (http://dx.doi.org/10.1145/321607.321609)
   */
@@ -3290,14 +3274,12 @@ static CubicHermite1D* akimaSpline1DInit(const double* table, size_t nRow,
         /* Actually there is no need for consecutive memory */
         spline = malloc((nRow - 1)*nCols*sizeof(CubicHermite1D));
         if (spline == NULL) {
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
 
         d = malloc((nRow + 3)*sizeof(double));
         if (d == NULL) {
             free(spline);
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
 
@@ -3361,7 +3343,7 @@ static CubicHermite1D* fritschButlandSpline1DInit(const double* table,
                                                   size_t nCols) {
   /* Reference:
 
-     Fritsch, Frederick N. and Butland, Judy. A method for constructing local
+     Frederick N. Fritsch and Judy Butland. A method for constructing local
      monotone piecewise cubic interpolants. SIAM Journal on Scientific and
      Statistical Computing, 5(2), 300–304, June 1984.
      (http://dx.doi.org/10.1137/0905021)
@@ -3376,14 +3358,12 @@ static CubicHermite1D* fritschButlandSpline1DInit(const double* table,
         /* Actually there is no need for consecutive memory */
         spline = malloc((nRow - 1)*nCols*sizeof(CubicHermite1D));
         if (spline == NULL) {
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
 
         d = malloc((nRow - 1)*sizeof(double));
         if (d == NULL) {
             free(spline);
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
 
@@ -3430,10 +3410,10 @@ static CubicHermite1D* fritschButlandSpline1DInit(const double* table,
     return spline;
 }
 
-static void spline1DClose(CubicHermite1D* spline) {
-    if (spline != NULL) {
-        free(spline);
-        spline = NULL;
+static void spline1DClose(CubicHermite1D** spline) {
+    if (spline != NULL && *spline != NULL) {
+        free(*spline);
+        *spline = NULL;
     }
 }
 
@@ -3484,7 +3464,7 @@ static void spline1DExtrapolateRight(double x1, double x2, double x3, double x4,
 static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCol) {
   /* Reference:
 
-     Akima, Hiroshi. A method of bivariate interpolation and smooth surface
+     Hiroshi Akima. A method of bivariate interpolation and smooth surface
      fitting based on local procedures. Communications of the ACM, 17(1), 18-20,
      Jan. 1974. (http://dx.doi.org/10.1145/360767.360779)
   */
@@ -3498,14 +3478,12 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
         /* Need to transpose */
         double* tableT = malloc(2*(nCol - 1)*sizeof(double));
         if (tableT == NULL) {
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
 
         spline = malloc((nCol - 1)*sizeof(CubicHermite2D));
         if (spline == NULL) {
             free(tableT);
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
 
@@ -3516,6 +3494,10 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
 
         spline1D = akimaSpline1DInit(tableT, nCol - 1, 2, &cols, 1);
         free(tableT);
+        if (spline1D == NULL) {
+            free(spline);
+            return NULL;
+        }
         /* Copy coefficients */
         for (j = 0; j < nCol - 1; j++) {
             const double* c1 = spline1D[j];
@@ -3524,7 +3506,7 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
             c2[1] = c1[1];
             c2[2] = c1[2];
         }
-        spline1DClose(spline1D);
+        spline1DClose(&spline1D);
     }
     else if (table != NULL && nRow > 2 && nCol == 2) {
         CubicHermite1D* spline1D;
@@ -3533,11 +3515,14 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
 
         spline = malloc((nRow - 1)*sizeof(CubicHermite2D));
         if (spline == NULL) {
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
 
         spline1D = akimaSpline1DInit(&table[2], nRow - 1, 2, &cols, 1);
+        if (spline1D == NULL) {
+            free(spline);
+            return NULL;
+        }
         /* Copy coefficients */
         for (i = 0; i < nRow - 1; i++) {
             const double* c1 = spline1D[i];
@@ -3546,7 +3531,7 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
             c2[1] = c1[1];
             c2[2] = c1[2];
         }
-        spline1DClose(spline1D);
+        spline1DClose(&spline1D);
     }
     else if (table != NULL && nRow > 2 && nCol > 2) {
         size_t i, j;
@@ -3566,7 +3551,6 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
         /* Copy of x coordinates with extrapolated boundary coordinates */
         x = malloc((nRow + 3)*sizeof(double));
         if (x == NULL) {
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
         if (nRow == 3) {
@@ -3593,7 +3577,6 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
         y = malloc((nCol + 3)*sizeof(double));
         if (y == NULL) {
             free(x);
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
         if (nCol == 3) {
@@ -3619,7 +3602,6 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
         if (tableEx == NULL) {
             free(y);
             free(x);
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
         for (i = 1; i < nRow; i++) {
@@ -3674,7 +3656,6 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
             free(tableEx);
             free(y);
             free(x);
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
 
@@ -3684,7 +3665,6 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
             free(tableEx);
             free(y);
             free(x);
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
 
@@ -3695,7 +3675,6 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
             free(tableEx);
             free(y);
             free(x);
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
 
@@ -3786,7 +3765,6 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
             free(dz_dx);
             free(dz_dy);
             free(d2z_dxdy);
-            ModelicaError("Memory allocation error\n");
             return NULL;
         }
 
@@ -3867,10 +3845,10 @@ static CubicHermite2D* spline2DInit(const double* table, size_t nRow, size_t nCo
 
 #undef TABLE_EX
 
-static void spline2DClose(CubicHermite2D* spline) {
-    if (spline != NULL) {
-        free(spline);
-        spline = NULL;
+static void spline2DClose(CubicHermite2D** spline) {
+    if (spline != NULL && *spline != NULL) {
+        free(*spline);
+        *spline = NULL;
     }
 }
 
@@ -3925,7 +3903,7 @@ static double* readTable(const char* tableName, const char* fileName,
             strcpy(key, tableName);
             strcat(key, "|");
             strcat(key, fileName);
-            TABLE_WRLOCK();
+            MUTEX_LOCK();
             HASH_FIND_STR(tableShare, key, iter);
             if (iter == NULL || force) {
 #endif
@@ -3951,7 +3929,7 @@ static double* readTable(const char* tableName, const char* fileName,
                 /* Release lock since readMatTable/readTxtTable may fail with
                    ModelicaError
                 */
-                TABLE_WRUNLOCK();
+                MUTEX_UNLOCK();
 #endif
                 if (isMatExt) {
                     table = readMatTable(tableName, fileName, nRow, nCol);
@@ -3964,7 +3942,7 @@ static double* readTable(const char* tableName, const char* fileName,
                 }
 #if defined(TABLE_SHARE)
                 /* Again ask for lock and search in hash table share */
-                TABLE_WRLOCK();
+                MUTEX_LOCK();
                 HASH_FIND_STR(tableShare, key, iter);
             }
             if (iter == NULL) {
@@ -4005,7 +3983,7 @@ static double* readTable(const char* tableName, const char* fileName,
                 *nRow = iter->nRow;
                 *nCol = iter->nCol;
             }
-            TABLE_WRUNLOCK();
+            MUTEX_UNLOCK();
             if (updateError == 1) {
                 ModelicaFormatError("Not possible to update shared "
                     "table \"%s\" from \"%s\": File and table name "
@@ -4480,7 +4458,7 @@ static int readLine(char** buf, int* bufLen, FILE* fp) {
 
     return 0;
 }
-#endif
+#endif /* #if !defined(NO_FILE_SYSTEM) */
 
 #if defined(DUMMY_FUNCTION_USERTAB)
 int usertab(char* tableName, int nipo, int dim[], int* colWise,
@@ -4488,4 +4466,4 @@ int usertab(char* tableName, int nipo, int dim[], int* colWise,
     ModelicaError("Function \"usertab\" is not implemented\n");
     return 1; /* Error */
 }
-#endif
+#endif /* #if defined(DUMMY_FUNCTION_USERTAB) */
