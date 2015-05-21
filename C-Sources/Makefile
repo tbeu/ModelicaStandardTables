@@ -3,7 +3,7 @@ AR = ar -ru
 RM = rm -f
 
 CFLAGS = -O3
-CXXFLAGS = -DTABLE_SHARE=1 -DDUMMY_FUNCTION_USERTAB -DHAVE_ZLIB=1 -DNDEBUG -I"zlib"
+CXXFLAGS = -DNDEBUG -I"zlib"
 
 TARGETDIR = linux64
 
@@ -34,7 +34,13 @@ libModelicaStandardTables.a: $(ALL_OBJS)
 	$(AR) $@ $(ALL_OBJS)
 	cp libModelicaStandardTables.a ../Library/$(TARGETDIR)/libModelicaStandardTables.a
 
-%.o: %.c
+ModelicaStandardTables.o: ModelicaStandardTables.c
+	$(CC) -c -o $@ $< $(CFLAGS) $(CXXFLAGS) -DTABLE_SHARE=1 -DDUMMY_FUNCTION_USERTAB
+
+ModelicaMatIO.o: ModelicaMatIO.c
+	$(CC) -c -o $@ $< $(CFLAGS) $(CXXFLAGS) -DHAVE_ZLIB=1
+
+%.o: zlib/%.c
 	$(CC) -c -o $@ $< $(CFLAGS) $(CXXFLAGS)
 
 clean:
