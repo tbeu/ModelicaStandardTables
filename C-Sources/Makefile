@@ -46,3 +46,4 @@ ModelicaMatIO.o: ModelicaMatIO.c
 clean:
 	$(RM) $(ALL_OBJS)
 	$(RM) *.a
+	$(RM) ../Library/$(TARGETDIR)/libModelicaStandardTables.a
