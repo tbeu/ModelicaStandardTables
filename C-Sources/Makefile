@@ -30,7 +30,7 @@ ZLIB_OBJS = \
 
 ALL_OBJS = $(OBJS) $(ZLIB_OBJS)
 
-libModelicaStandardTables.a: $(ALL_OBJS)
+libModelicaStandardTables.a: clean $(ALL_OBJS)
 	$(AR) $@ $(ALL_OBJS)
 	cp libModelicaStandardTables.a ../Library/$(TARGETDIR)/libModelicaStandardTables.a
 
