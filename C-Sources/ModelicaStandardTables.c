@@ -3345,7 +3345,7 @@ static CubicHermite1D* fritschButlandSpline1DInit(const double* table,
 
      Frederick N. Fritsch and Judy Butland. A method for constructing local
      monotone piecewise cubic interpolants. SIAM Journal on Scientific and
-     Statistical Computing, 5(2), 300304, June 1984.
+     Statistical Computing, 5(2), 300-304, June 1984.
      (http://dx.doi.org/10.1137/0905021)
   */
 
