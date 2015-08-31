@@ -1443,13 +1443,15 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
                         tableID->eventInterval =
                             1 + tableID->eventInterval % tableID->maxEvents;
                         if (tableID->eventInterval == tableID->maxEvents) {
-                            nextTimeEvent = tMax + tableID->tOffset + tableID->startTime;
+                            nextTimeEvent = tMax + tableID->tOffset +
+                                tableID->startTime;
                             tableID->tOffset += T;
                         }
                         else {
                             size_t i = tableID->intervals[
                                 tableID->eventInterval - 1][1];
-                            nextTimeEvent = TABLE_COL0(i) + tableID->tOffset + tableID->startTime;
+                            nextTimeEvent = TABLE_COL0(i) + tableID->tOffset +
+                                tableID->startTime;
                         }
                     }
                     else if (tableID->eventInterval <= tableID->maxEvents) {
