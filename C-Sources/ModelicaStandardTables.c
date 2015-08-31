@@ -1434,7 +1434,7 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
 #endif
                 if (nextTimeEvent < DBL_MAX) {
                     nextTimeEvent += tableID->startTime;
-            }
+                }
             }
             else {
                 do {
