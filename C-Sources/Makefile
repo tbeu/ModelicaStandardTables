@@ -36,13 +36,13 @@ libModelicaStandardTables.a: clean $(ALL_OBJS)
 	cp libModelicaStandardTables.a ../Library/$(TARGETDIR)/libModelicaStandardTables.a
 
 ModelicaStandardTables.o: ModelicaStandardTables.c
-	$(CC) -c -o $@ $< $(CPPFLAGS) -DTABLE_SHARE=1 -DDUMMY_FUNCTION_USERTAB $(CFLAGS) $(INC)
+	$(CC) $(CPPFLAGS) -DTABLE_SHARE=1 -DDUMMY_FUNCTION_USERTAB $(CFLAGS) $(INC) -c -o $@ $<
 
 ModelicaMatIO.o: ModelicaMatIO.c
-	$(CC) -c -o $@ $< $(CPPFLAGS) -DHAVE_ZLIB=1 $(CFLAGS) $(INC)
+	$(CC) $(CPPFLAGS) -DHAVE_ZLIB=1 $(CFLAGS) $(INC) -c -o $@ $<
 
 %.o: zlib/%.c
-	$(CC) -c -o $@ $< $(CPPFLAGS) $(CFLAGS) $(INC)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(INC) -c -o $@ $<
 
 clean:
 	$(RM) $(ALL_OBJS)
