@@ -59,6 +59,18 @@
 
 #include <stdlib.h>
 
+/*
+ * Non-NULL pointers need to be passed to external functions.
+ *
+ * The following macro handles the nonnull attribute for GNU C to tell the
+ * compiler to check all pointer arguments for non-NULL.
+ */
+#if defined(__GNUC__) && !defined(MODELICA_NONNULLATTR)
+#define MODELICA_NONNULLATTR __attribute__((nonnull))
+#else
+#define MODELICA_NONNULLATTR
+#endif
+
 #if defined(__cplusplus)
 extern "C"
 #else
@@ -71,7 +83,7 @@ void* ModelicaStandardTables_CombiTimeTable_init(const char* tableName,
                                                  double startTime,
                                                  int* columns,
                                                  size_t nCols, int smoothness,
-                                                 int extrapolation);
+                                                 int extrapolation) MODELICA_NONNULLATTR;
   /* Initialize 1-dim. table where first column is time
 
      -> tableName: Name of table
@@ -200,7 +212,7 @@ void* ModelicaStandardTables_CombiTable1D_init(const char* tableName,
                                                double* table, size_t nRow,
                                                size_t nColumn,
                                                int* columns,
-                                               size_t nCols, int smoothness);
+                                               size_t nCols, int smoothness) MODELICA_NONNULLATTR;
   /* Initialize 1-dim. table defined by matrix, where first column
      is x-axis and further columns of matrix are interpolated
 
@@ -284,7 +296,7 @@ extern
 void* ModelicaStandardTables_CombiTable2D_init(const char* tableName,
                                                const char* fileName,
                                                double* table, size_t nRow,
-                                               size_t nColumn, int smoothness);
+                                               size_t nColumn, int smoothness) MODELICA_NONNULLATTR;
   /* Initialize 2-dim. table defined by matrix, where first column
      is x-axis, first row is y-axis and the matrix elements are the
      z-values.
