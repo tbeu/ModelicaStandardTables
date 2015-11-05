@@ -8,7 +8,7 @@ The library was presented at the [10th International Modelica Conference] (https
 [![Build Status](https://drone.io/github.com/tbeu/ModelicaStandardTables/status.png)](https://drone.io/github.com/tbeu/ModelicaStandardTables/latest)
 
 ## License
-ModelicaStandardTables is released under the terms of the modified BSD license.
+ModelicaStandardTables is released under the terms of the Modified BSD License.
 
 ## Acknowledgement
 ModelicaStandardTables is based on the following third-party C projects
