@@ -175,7 +175,13 @@
 #endif
 
 /* Platform */
+#if defined(_MSC_VER) && defined(_WIN64)
+#define MATIO_PLATFORM "x86_64-pc-windows"
+#elif defined(_MSC_VER) && defined(_WIN32)
+#define MATIO_PLATFORM "i686-pc-windows"
+#else
 #define MATIO_PLATFORM "UNKNOWN"
+#endif
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
