@@ -9794,10 +9794,11 @@ Mat_VarDelete(mat_t *mat, const char *name)
             /* FIXME: Memory leak */
             new_name = strdup_printf("%s",mat->filename);
             fclose(mat->fp);
+            Mat_Close(tmp);
 
             if ( (err = remove(new_name)) == -1 ) {
                 Mat_Critical("remove of %s failed",new_name);
-            } else if ( !Mat_Close(tmp) && (err=mat_rename(tmp_name,new_name))==-1) {
+            } else if ( (err=mat_rename(tmp_name,new_name))==-1) {
                 Mat_Critical("rename failed oldname=%s,newname=%s",tmp_name,
                     new_name);
             } else {
