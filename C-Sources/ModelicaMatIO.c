@@ -1789,7 +1789,6 @@ ReadCompressedDoubleData(mat_t *mat,z_stream *z,double *data,
         mat_uint8_t   ui8[1024];
     } buf;
 
-
     switch ( data_type ) {
         case MAT_T_DOUBLE:
         {
@@ -8674,7 +8673,6 @@ static double my_modf(double x0, double *iptr)
     return x - (*iptr);
 }
 
-
 static void fmtfp (char *buffer, size_t *currlen, size_t maxlen,
                    LDOUBLE fvalue, int min, int max, int flags)
 {
@@ -10162,7 +10160,6 @@ Mat_CalcSingleSubscript(int rank,int *dims,int *subs)
     return index;
 }
 
-
 /** @brief Calculate a set of subscript values from a single(linear) subscript
  *
  * Calculates 1-relative subscripts for each dimension given a 0-relative
@@ -10872,6 +10869,7 @@ Mat_VarWrite(mat_t *mat,matvar_t *matvar,enum matio_compression compress)
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <math.h>
 
@@ -17081,7 +17079,6 @@ WriteInfo5(mat_t *mat, matvar_t *matvar)
     /* FIXME: SEEK_END is not Guaranteed by the C standard */
     fseek(mat->fp,0,SEEK_END);         /* Always write at end of file */
 
-
     if ( matvar->compression == MAT_COMPRESSION_NONE ) {
         fwrite(&matrix_type,4,1,mat->fp);
         fwrite(&pad4,4,1,mat->fp);
@@ -18971,7 +18968,6 @@ Mat_VarWriteCell73(hid_t id,matvar_t *matvar,const char *name,hid_t *refs_id)
 
     return err;
 }
-
 
 /** @if mat_devman
  * @brief Writes a character matlab variable to the specified HDF id with the
