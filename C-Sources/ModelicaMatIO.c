@@ -9791,7 +9791,6 @@ Mat_VarDelete(mat_t *mat, const char *name)
                     err = 0;
                 Mat_VarFree(matvar);
             }
-            /* FIXME: Memory leak */
             new_name = strdup_printf("%s",mat->filename);
 #if defined(HAVE_HDF5)
             if ( mat_file_ver == MAT_FT_MAT73 ) {
@@ -9815,10 +9814,17 @@ Mat_VarDelete(mat_t *mat, const char *name)
                     new_name);
             } else {
                 tmp = Mat_Open(new_name,mat->mode);
-                if ( NULL != tmp )
+                if ( NULL != tmp ) {
+                    if ( mat->header )
+                        free(mat->header);
+                    if ( mat->subsys_offset )
+                        free(mat->subsys_offset);
+                    if ( mat->filename )
+                        free(mat->filename);
                     memcpy(mat,tmp,sizeof(mat_t));
+                    free(tmp);
+                }
             }
-            free(tmp);
             free(new_name);
         }
     }
