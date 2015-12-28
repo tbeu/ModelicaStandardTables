@@ -582,6 +582,7 @@ Mat_doubleSwap( double *a )
     return *a;
 
 }
+
 /* -------------------------------
  * ---------- inflate.c
  * -------------------------------
@@ -1417,6 +1418,7 @@ InflateFieldNames(mat_t *mat,matvar_t *matvar,void *buf,int nfields,
 /** @endcond */
 
 #endif
+
 /* -------------------------------
  * ---------- io.c
  * -------------------------------
@@ -1567,6 +1569,7 @@ Mat_SizeOf(enum matio_types data_type)
             return 0;
     }
 }
+
 /* -------------------------------
  * ---------- read_data.c
  * -------------------------------
@@ -8047,6 +8050,7 @@ ReadCompressedDataSlab2(mat_t *mat,z_stream *z,void *data,
 #endif
 
 /** @endcond */
+
 /* -------------------------------
  * ---------- snprintf.c
  * -------------------------------
@@ -10896,6 +10900,7 @@ Mat_VarWrite(mat_t *mat,matvar_t *matvar,enum matio_compression compress)
 
     return 1;
 }
+
 /* -------------------------------
  * ---------- mat4.c
  * -------------------------------
@@ -11396,6 +11401,7 @@ Mat_VarReadNextInfo4(mat_t *mat)
 
     return matvar;
 }
+
 /* -------------------------------
  * ---------- mat5.c
  * -------------------------------
@@ -17674,6 +17680,7 @@ Mat_VarReadNextInfo5( mat_t *mat )
 
     return matvar;
 }
+
 /* -------------------------------
  * ---------- mat73.c
  * -------------------------------
@@ -20564,6 +20571,7 @@ Mat_VarWrite73(mat_t *mat,matvar_t *matvar,int compress)
 }
 
 #endif
+
 /* -------------------------------
  * ---------- matvar_cell.c
  * -------------------------------
@@ -20725,6 +20733,7 @@ Mat_VarSetCell(matvar_t *matvar,int index,matvar_t *cell)
 
     return old_cell;
 }
+
 /* -------------------------------
  * ---------- matvar_struct.c
  * -------------------------------
