@@ -9824,6 +9824,9 @@ Mat_VarDelete(mat_t *mat, const char *name)
                     memcpy(mat,tmp,sizeof(mat_t));
                     free(tmp);
                 }
+                else {
+                    Mat_Critical("Cannot open file \"%s\".",mat->filename);
+                }
             }
             free(new_name);
         }
