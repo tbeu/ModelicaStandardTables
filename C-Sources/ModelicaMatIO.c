@@ -9796,7 +9796,7 @@ Mat_VarDelete(mat_t *mat, const char *name)
             matvar_t *matvar;
             while ( NULL != (matvar = Mat_VarReadNext(mat)) ) {
                 if ( strcmp(matvar->name,name) )
-                    Mat_VarWrite(tmp,matvar,MAT_COMPRESSION_NONE);
+                    Mat_VarWrite(tmp,matvar,matvar->compression);
                 else
                     err = 0;
                 Mat_VarFree(matvar);
