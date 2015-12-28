@@ -9712,7 +9712,14 @@ Mat_VarCreate(const char *name,enum matio_classes class_type,
     return matvar;
 }
 
-static int mat_rename(const char* src, const char* dst)
+/** @brief Copies a file
+ *
+ * @param src source file path
+ * @param dst destination file path
+ * @retval 0 on success
+ */
+static int
+mat_copy(const char* src, const char* dst)
 {
     size_t len;
     char buf[BUFSIZ] = {'\0'};
@@ -9742,7 +9749,6 @@ static int mat_rename(const char* src, const char* dst)
     }
     fclose(in);
     fclose(out);
-    remove(src);
     return 0;
 }
 
@@ -9791,6 +9797,7 @@ Mat_VarDelete(mat_t *mat, const char *name)
                     err = 0;
                 Mat_VarFree(matvar);
             }
+
             new_name = strdup_printf("%s",mat->filename);
 #if defined(HAVE_HDF5)
             if ( mat_file_ver == MAT_FT_MAT73 ) {
@@ -9807,11 +9814,11 @@ Mat_VarDelete(mat_t *mat, const char *name)
             }
             Mat_Close(tmp);
 
-            if ( (err = remove(new_name)) == -1 ) {
-                Mat_Critical("remove of %s failed",new_name);
-            } else if ( (err=mat_rename(tmp_name,new_name))==-1) {
-                Mat_Critical("rename failed oldname=%s,newname=%s",tmp_name,
-                    new_name);
+            if ( (err = mat_copy(tmp_name,new_name)) == -1 ) {
+                Mat_Critical("Cannot copy file from \"%s\" to \"%s\".",
+                    tmp_name, new_name);
+            } else if ( (err = remove(tmp_name)) == -1 ) {
+                Mat_Critical("Cannot remove file \"%s\".",tmp_name);
             } else {
                 tmp = Mat_Open(new_name,mat->mode);
                 if ( NULL != tmp ) {
