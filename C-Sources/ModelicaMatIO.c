@@ -9792,7 +9792,6 @@ Mat_VarDelete(mat_t *mat, const char *name)
 
         tmp = Mat_CreateVer(tmp_name,mat->header,mat_file_ver);
         if ( tmp != NULL ) {
-            char *new_name;
             matvar_t *matvar;
             while ( NULL != (matvar = Mat_VarReadNext(mat)) ) {
                 if ( strcmp(matvar->name,name) )
@@ -9804,7 +9803,7 @@ Mat_VarDelete(mat_t *mat, const char *name)
             Mat_Close(tmp);
 
             if (err == 0) {
-                new_name = strdup_printf("%s",mat->filename);
+                char *new_name = strdup_printf("%s",mat->filename);
 #if defined(HAVE_HDF5)
                 if ( mat_file_ver == MAT_FT_MAT73 ) {
                     if ( mat->refs_id > -1 )
@@ -9837,7 +9836,7 @@ Mat_VarDelete(mat_t *mat, const char *name)
                         free(tmp);
                     }
                     else {
-                        Mat_Critical("Cannot open file \"%s\".",mat->filename);
+                        Mat_Critical("Cannot open file \"%s\".",new_name);
                     }
                 }
                 free(new_name);
