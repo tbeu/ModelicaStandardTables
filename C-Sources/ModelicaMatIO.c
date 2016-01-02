@@ -6282,7 +6282,7 @@ ReadCompressedDataSlabN(mat_t *mat,z_stream *z,void *data,
                 N *= edge[i];
                 I += dimp[i-1]*start[i];
             }
-            /* Skip all data to the starting indeces */
+            /* Skip all data to the starting indices */
             InflateSkipData(mat,&z_copy,data_type,I);
             if ( stride[0] == 1 ) {
                 for ( i = 0; i < N; i+=edge[0] ) {
@@ -6378,7 +6378,7 @@ ReadCompressedDataSlabN(mat_t *mat,z_stream *z,void *data,
                 N *= edge[i];
                 I += dimp[i-1]*start[i];
             }
-            /* Skip all data to the starting indeces */
+            /* Skip all data to the starting indices */
             InflateSkipData(mat,&z_copy,data_type,I);
             if ( stride[0] == 1 ) {
                 for ( i = 0; i < N; i+=edge[0] ) {
@@ -6470,7 +6470,7 @@ ReadCompressedDataSlabN(mat_t *mat,z_stream *z,void *data,
                 N *= edge[i];
                 I += dimp[i-1]*start[i];
             }
-            /* Skip all data to the starting indeces */
+            /* Skip all data to the starting indices */
             InflateSkipData(mat,&z_copy,data_type,I);
             if ( stride[0] == 1 ) {
                 for ( i = 0; i < N; i+=edge[0] ) {
@@ -6563,7 +6563,7 @@ ReadCompressedDataSlabN(mat_t *mat,z_stream *z,void *data,
                 N *= edge[i];
                 I += dimp[i-1]*start[i];
             }
-            /* Skip all data to the starting indeces */
+            /* Skip all data to the starting indices */
             InflateSkipData(mat,&z_copy,data_type,I);
             if ( stride[0] == 1 ) {
                 for ( i = 0; i < N; i+=edge[0] ) {
@@ -6655,7 +6655,7 @@ ReadCompressedDataSlabN(mat_t *mat,z_stream *z,void *data,
                 N *= edge[i];
                 I += dimp[i-1]*start[i];
             }
-            /* Skip all data to the starting indeces */
+            /* Skip all data to the starting indices */
             InflateSkipData(mat,&z_copy,data_type,I);
             if ( stride[0] == 1 ) {
                 for ( i = 0; i < N; i+=edge[0] ) {
@@ -6746,7 +6746,7 @@ ReadCompressedDataSlabN(mat_t *mat,z_stream *z,void *data,
                 N *= edge[i];
                 I += dimp[i-1]*start[i];
             }
-            /* Skip all data to the starting indeces */
+            /* Skip all data to the starting indices */
             InflateSkipData(mat,&z_copy,data_type,I);
             if ( stride[0] == 1 ) {
                 for ( i = 0; i < N; i+=edge[0] ) {
@@ -6837,7 +6837,7 @@ ReadCompressedDataSlabN(mat_t *mat,z_stream *z,void *data,
                 N *= edge[i];
                 I += dimp[i-1]*start[i];
             }
-            /* Skip all data to the starting indeces */
+            /* Skip all data to the starting indices */
             InflateSkipData(mat,&z_copy,data_type,I);
             if ( stride[0] == 1 ) {
                 for ( i = 0; i < N; i+=edge[0] ) {
@@ -6928,7 +6928,7 @@ ReadCompressedDataSlabN(mat_t *mat,z_stream *z,void *data,
                 N *= edge[i];
                 I += dimp[i-1]*start[i];
             }
-            /* Skip all data to the starting indeces */
+            /* Skip all data to the starting indices */
             InflateSkipData(mat,&z_copy,data_type,I);
             if ( stride[0] == 1 ) {
                 for ( i = 0; i < N; i+=edge[0] ) {
@@ -7019,7 +7019,7 @@ ReadCompressedDataSlabN(mat_t *mat,z_stream *z,void *data,
                 N *= edge[i];
                 I += dimp[i-1]*start[i];
             }
-            /* Skip all data to the starting indeces */
+            /* Skip all data to the starting indices */
             InflateSkipData(mat,&z_copy,data_type,I);
             if ( stride[0] == 1 ) {
                 for ( i = 0; i < N; i+=edge[0] ) {
@@ -7110,7 +7110,7 @@ ReadCompressedDataSlabN(mat_t *mat,z_stream *z,void *data,
                 N *= edge[i];
                 I += dimp[i-1]*start[i];
             }
-            /* Skip all data to the starting indeces */
+            /* Skip all data to the starting indices */
             InflateSkipData(mat,&z_copy,data_type,I);
             if ( stride[0] == 1 ) {
                 for ( i = 0; i < N; i+=edge[0] ) {
@@ -11238,7 +11238,7 @@ Mat_VarReadDataLinear4(mat_t *mat,matvar_t *matvar,void *data,int start,
  *
  * @ingroup mat_internal
  * @param mat MAT file pointer
- * @retuen pointer to the MAT variable or NULL
+ * @return pointer to the MAT variable or NULL
  * @endif
  */
 matvar_t *
@@ -17422,7 +17422,7 @@ WriteInfo5(mat_t *mat, matvar_t *matvar)
  *
  * @ingroup mat_internal
  * @param mat MAT file pointer
- * @retuen pointer to the MAT variable or NULL
+ * @return pointer to the MAT variable or NULL
  * @endif
  */
 matvar_t *
