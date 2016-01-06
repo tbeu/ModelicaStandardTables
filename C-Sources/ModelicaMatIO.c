@@ -100,7 +100,7 @@
 #endif
 
 /* Have snprintf */
-#if defined(__LCC__) || (defined(_MSC_VER) && _MSC_VER < 1400)
+#if defined(__LCC__) || (defined(_MSC_VER) && _MSC_VER < 1900)
 #undef HAVE_SNPRINTF
 #else
 #define HAVE_SNPRINTF 1
@@ -159,7 +159,7 @@
 #if !defined(HAVE_C99_VSNPRINTF)
 #define HAVE_C99_VSNPRINTF 1
 #endif
-#elif defined(_MSC_VER) && _MSC_VER >= 1400
+#elif defined(_MSC_VER) && _MSC_VER >= 1900
 #define HAVE_VSNPRINTF 1
 #if !defined(HAVE_C99_VSNPRINTF)
 #define HAVE_C99_VSNPRINTF 1
