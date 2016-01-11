@@ -16524,12 +16524,11 @@ Mat_VarReadDataLinear5(mat_t *mat,matvar_t *matvar,void *data,int start,
             }
             ReadCompressedDataSlab1(mat,&z,complex_data->Im,
                 matvar->class_type,matvar->data_type,start,stride,edge);
-            inflateEnd(&z);
         } else {
             ReadCompressedDataSlab1(mat,&z,data,matvar->class_type,
-                                    matvar->data_type,start,stride,edge);
-            inflateEnd(&z);
+                matvar->data_type,start,stride,edge);
         }
+        inflateEnd(&z);
 #endif
     }
 
