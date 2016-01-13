@@ -8,8 +8,10 @@ INC = -I"zlib"
 
 TARGETDIR = linux64
 
-OBJS = \
-	ModelicaStandardTables.o \
+TABLES_OBJS = \
+	ModelicaStandardTables.o
+
+MATIO_OBJS = \
 	ModelicaMatIO.o
 
 ZLIB_OBJS = \
@@ -29,11 +31,19 @@ ZLIB_OBJS = \
 	uncompr.o \
 	zutil.o
 
-ALL_OBJS = $(OBJS) $(ZLIB_OBJS)
+ALL_OBJS = $(TABLES_OBJS) $(MATIO_OBJS) $(ZLIB_OBJS)
 
-libModelicaStandardTables.a: clean $(ALL_OBJS)
-	$(AR) $@ $(ALL_OBJS)
-	cp libModelicaStandardTables.a ../Library/$(TARGETDIR)/libModelicaStandardTables.a
+libModelicaStandardTables.a: clean $(TABLES_OBJS) libModelicaMatIO.a libzlib.a
+	$(AR) $@ $(TABLES_OBJS)
+	cp $@ ../Library/$(TARGETDIR)/$@
+
+libModelicaMatIO.a: $(MATIO_OBJS)
+	$(AR) $@ $(MATIO_OBJS)
+	cp $@ ../Library/$(TARGETDIR)/$@
+
+libzlib.a: $(ZLIB_OBJS)
+	$(AR) $@ $(ZLIB_OBJS)
+	cp $@ ../Library/$(TARGETDIR)/$@
 
 ModelicaStandardTables.o: ModelicaStandardTables.c
 	$(CC) $(CPPFLAGS) -DTABLE_SHARE=1 -DDUMMY_FUNCTION_USERTAB $(CFLAGS) $(INC) -c -o $@ $<
@@ -47,4 +57,4 @@ ModelicaMatIO.o: ModelicaMatIO.c
 clean:
 	$(RM) $(ALL_OBJS)
 	$(RM) *.a
-	$(RM) ../Library/$(TARGETDIR)/libModelicaStandardTables.a
+	$(RM) ../Library/$(TARGETDIR)/*.a
