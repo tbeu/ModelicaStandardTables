@@ -14,6 +14,9 @@ TABLES_OBJS = \
 MATIO_OBJS = \
 	ModelicaMatIO.o
 
+IO_OBJS = \
+	ModelicaIO.o
+
 ZLIB_OBJS = \
 	adler32.o \
 	compress.o \
@@ -31,14 +34,20 @@ ZLIB_OBJS = \
 	uncompr.o \
 	zutil.o
 
-ALL_OBJS = $(TABLES_OBJS) $(MATIO_OBJS) $(ZLIB_OBJS)
+ALL_OBJS = $(TABLES_OBJS) $(MATIO_OBJS) $(IO_OBJS) $(ZLIB_OBJS)
 
-libModelicaStandardTables.a: clean $(TABLES_OBJS) libModelicaMatIO.a libzlib.a
+all: clean libModelicaStandardTables.a libModelicaIO.a libModelicaMatIO.a libzlib.a
+
+libModelicaStandardTables.a: $(TABLES_OBJS)
 	$(AR) $@ $(TABLES_OBJS)
 	cp $@ ../Library/$(TARGETDIR)/$@
 
 libModelicaMatIO.a: $(MATIO_OBJS)
 	$(AR) $@ $(MATIO_OBJS)
+	cp $@ ../Library/$(TARGETDIR)/$@
+
+libModelicaIO.a: $(IO_OBJS)
+	$(AR) $@ $(IO_OBJS)
 	cp $@ ../Library/$(TARGETDIR)/$@
 
 libzlib.a: $(ZLIB_OBJS)
@@ -50,6 +59,9 @@ ModelicaStandardTables.o: ModelicaStandardTables.c
 
 ModelicaMatIO.o: ModelicaMatIO.c
 	$(CC) $(CPPFLAGS) -DHAVE_ZLIB=1 $(CFLAGS) $(INC) -c -o $@ $<
+
+ModelicaIO.o: ModelicaIO.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(INC) -c -o $@ $<
 
 %.o: zlib/%.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(INC) -c -o $@ $<
