@@ -42,13 +42,13 @@ static void ModelicaNotExistError(const char* name) {
         "as for dSPACE or xPC systems)\n", name);
 }
 
-MODELICA_EXPORT void ModelicaInternal_readMatrixSizes(const char* fileName,
+MODELICA_EXPORT void ModelicaIO_readMatrixSizes(const char* fileName,
     const char* varName, int* dim) {
     ModelicaNotExistError("ModelicaInternal_readMatrixSizes"); }
-MODELICA_EXPORT void ModelicaInternal_readRealMatrix(const char* fileName,
+MODELICA_EXPORT void ModelicaIO_readRealMatrix(const char* fileName,
     const char* varName, double* a, size_t m, size_t n) {
     ModelicaNotExistError("ModelicaInternal_readRealMatrix"); }
-MODELICA_EXPORT int ModelicaInternal_writeRealMatrix(const char* fileName,
+MODELICA_EXPORT int ModelicaIO_writeRealMatrix(const char* fileName,
     const char* varName, double* a, size_t m, size_t n, int append, const char* version) {
     ModelicaNotExistError("ModelicaInternal_writeRealMatrix"); return 0; }
 #else
@@ -92,7 +92,7 @@ static void transpose(double* table, size_t nRow, size_t nCol) {
    }
 }
 
-MODELICA_EXPORT void ModelicaInternal_readMatrixSizes(const char* fileName,
+MODELICA_EXPORT void ModelicaIO_readMatrixSizes(const char* fileName,
     const char* varName, int* dim) {
     mat_t* mat;
     matvar_t* matvar;
@@ -163,7 +163,7 @@ MODELICA_EXPORT void ModelicaInternal_readMatrixSizes(const char* fileName,
     (void)Mat_Close(mat);
 }
 
-MODELICA_EXPORT void ModelicaInternal_readRealMatrix(const char* fileName,
+MODELICA_EXPORT void ModelicaIO_readRealMatrix(const char* fileName,
     const char* varName, double* a, size_t m, size_t n) {
     mat_t* mat;
     matvar_t* matvar;
@@ -289,7 +289,7 @@ MODELICA_EXPORT void ModelicaInternal_readRealMatrix(const char* fileName,
     }
 }
 
-MODELICA_EXPORT int ModelicaInternal_writeRealMatrix(const char* fileName,
+MODELICA_EXPORT int ModelicaIO_writeRealMatrix(const char* fileName,
     const char* varName, double* a, size_t m, size_t n, int append, const char* version) {
     int status;
     mat_t* mat;
