@@ -57,7 +57,9 @@
 
 #include "ModelicaUtilities.h"
 #if !defined(NO_FILE_SYSTEM)
-#if defined(__MINGW32__)
+#if defined(__gnu_linux__)
+#define _GNU_SOURCE 1
+#elif defined(__MINGW32__)
 #define __USE_MINGW_ANSI_STDIO 1
 #endif
 #include <stdarg.h>
@@ -207,7 +209,11 @@
 #endif
 
 /* Define to 1 if the system has the type `uintptr_t'. */
+#if defined(__LCC__) || (defined(_MSC_VER) && _MSC_VER <= 1200)
+#undef HAVE_UINTPTR_T
+#else
 #define HAVE_UINTPTR_T 1
+#endif
 
 /* Define to 1 if the system has the type `unsigned long long int'. */
 #if defined (_WIN32)
@@ -8561,8 +8567,6 @@ static UINTMAX_T cast(LDOUBLE);
 static UINTMAX_T myround(LDOUBLE);
 static LDOUBLE mypow10(int);
 
-//extern int errno;
-
 int
 rpl_vsnprintf(char *str, size_t size, const char *format, va_list args)
 {
@@ -9510,7 +9514,7 @@ mypow10(int exponent)
 
 #if !HAVE_VASPRINTF
 #if NEED_MYMEMCPY
-void *
+static void *
 mymemcpy(void *dst, void *src, size_t len)
 {
     const char *from = src;
@@ -9758,7 +9762,7 @@ Mat_PrintNumber(enum matio_types type, void *data)
             break;
 #ifdef HAVE_MATIO_INT64_T
         case MAT_T_INT64:
-#ifdef HAVE_LONG_LONG
+#ifdef HAVE_LONG_LONG_INT
             printf("%lld",(long long)(*(mat_int64_t*)data));
 #else
             printf("%lld",*(mat_int64_t*)data);
@@ -9767,7 +9771,7 @@ Mat_PrintNumber(enum matio_types type, void *data)
 #endif
 #ifdef HAVE_MATIO_UINT64_T
         case MAT_T_UINT64:
-#ifdef HAVE_LONG_LONG
+#ifdef HAVE_UNSIGNED_LONG_LONG_INT
             printf("%llu",(unsigned long long)(*(mat_uint64_t*)data));
 #else
             printf("%llu",*(mat_uint64_t*)data);
@@ -10478,7 +10482,8 @@ Mat_VarDelete(mat_t *mat, const char *name)
     if ( NULL == mat || NULL == name )
         return err;
 
-    if ( (tmp_name = mktemp(temp)) != NULL ) {
+    tmp_name = mktemp(temp);
+    if (tmp_name != NULL) {
         enum mat_ft mat_file_ver = MAT_FT_DEFAULT;
         mat_t *tmp;
 
@@ -11712,7 +11717,7 @@ Mat_VarWrite(mat_t *mat,matvar_t *matvar,enum matio_compression compress)
  * simple FILE * and should not be used as one.
  * @endif
  */
-mat_t *
+static mat_t *
 Mat_Create4(const char* matname)
 {
     FILE *fp = NULL;
@@ -11754,7 +11759,7 @@ Mat_Create4(const char* matname)
  * @retval 0 on success
  * @endif
  */
-int
+static int
 Mat_VarWrite4(mat_t *mat,matvar_t *matvar)
 {
     typedef struct {
@@ -11836,7 +11841,7 @@ Mat_VarWrite4(mat_t *mat,matvar_t *matvar)
  * @param matvar MAT variable pointer to read the data
  * @endif
  */
-void
+static void
 Read4(mat_t *mat,matvar_t *matvar)
 {
     unsigned int N;
@@ -11901,7 +11906,7 @@ Read4(mat_t *mat,matvar_t *matvar)
  * @retval 0 on success
  * @endif
  */
-int
+static int
 ReadData4(mat_t *mat,matvar_t *matvar,void *data,
       int *start,int *stride,int *edge)
 {
@@ -11986,7 +11991,7 @@ ReadData4(mat_t *mat,matvar_t *matvar,void *data,
  * @param edge number of elements to read
  * @retval 0 on success
  */
-int
+static int
 Mat_VarReadDataLinear4(mat_t *mat,matvar_t *matvar,void *data,int start,
                        int stride,int edge)
 {
@@ -12028,7 +12033,7 @@ Mat_VarReadDataLinear4(mat_t *mat,matvar_t *matvar,void *data,int start,
  * @return pointer to the MAT variable or NULL
  * @endif
  */
-matvar_t *
+static matvar_t *
 Mat_VarReadNextInfo4(mat_t *mat)
 {
     int       tmp,M,O,data_type,class_type;
@@ -12645,7 +12650,7 @@ GetMatrixMaxBufSize(matvar_t *matvar)
  * simple FILE * and should not be used as one.
  * @endif
  */
-mat_t *
+static mat_t *
 Mat_Create5(const char *matname,const char *hdr_str)
 {
     FILE *fp = NULL;
@@ -13353,7 +13358,7 @@ WriteCompressedEmptyData(mat_t *mat,z_stream *z,int N,
  * @return number of byteswritten
  * @endif
  */
-int
+static int
 WriteDataSlab2(mat_t *mat,void *data,enum matio_types data_type,size_t *dims,
     int *start,int *stride,int *edge)
 {
@@ -13615,7 +13620,7 @@ WriteDataSlab2(mat_t *mat,void *data,enum matio_types data_type,size_t *dims,
  * @return number of byteswritten
  * @endif
  */
-int
+static int
 WriteCharDataSlab2(mat_t *mat,void *data,enum matio_types data_type,
     size_t *dims,int *start,int *stride,int *edge)
 {
@@ -13712,7 +13717,7 @@ WriteCharDataSlab2(mat_t *mat,void *data,enum matio_types data_type,
  * @param data_type data type of the data
  * @return number of bytes written
  */
-int
+static int
 WriteData(mat_t *mat,void *data,int N,enum matio_types data_type)
 {
     int nBytes = 0, data_size;
@@ -15887,7 +15892,7 @@ Mat_VarReadNumeric5(mat_t *mat,matvar_t *matvar,void *data,size_t N)
  * @param matvar MAT variable pointer to read the data
  * @endif
  */
-void
+static void
 Read5(mat_t *mat, matvar_t *matvar)
 {
     int nBytes = 0, len = 1, i, byteswap, data_in_tag = 0;
@@ -17054,7 +17059,7 @@ Read5(mat_t *mat, matvar_t *matvar)
  * @retval 0 on success
  * @endif
  */
-int
+static int
 ReadData5(mat_t *mat,matvar_t *matvar,void *data,
     int *start,int *stride,int *edge)
 {
@@ -17295,7 +17300,7 @@ ReadData5(mat_t *mat,matvar_t *matvar,void *data,
  * @param edge number of elements to read
  * @retval 0 on success
  */
-int
+static int
 Mat_VarReadDataLinear5(mat_t *mat,matvar_t *matvar,void *data,int start,
                       int stride,int edge)
 {
@@ -17470,7 +17475,7 @@ Mat_VarReadDataLinear5(mat_t *mat,matvar_t *matvar,void *data,int start,
  * @retval 0 on success
  * @endif
  */
-int
+static int
 Mat_VarWrite5(mat_t *mat,matvar_t *matvar,int compress)
 {
     mat_uint32_t array_flags = 0x0;
@@ -18000,7 +18005,7 @@ Mat_VarWrite5(mat_t *mat,matvar_t *matvar,int compress)
  * @param matvar pointer to the mat variable
  * @endif
  */
-void
+static void
 WriteInfo5(mat_t *mat, matvar_t *matvar)
 {
     mat_uint32_t array_flags = 0x0;
@@ -18335,7 +18340,7 @@ WriteInfo5(mat_t *mat, matvar_t *matvar)
  * @return pointer to the MAT variable or NULL
  * @endif
  */
-matvar_t *
+static matvar_t *
 Mat_VarReadNextInfo5( mat_t *mat )
 {
     int err, data_type, nBytes, i;
