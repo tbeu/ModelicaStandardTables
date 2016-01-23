@@ -2927,6 +2927,7 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
                         u1*(y00 - y01 - y10 + y11))*der_u2;
                     der_y /= (u10 - u11);
                     der_y /= (u20 - u21);
+                    break;
                 }
 
                 case AKIMA_C1:
