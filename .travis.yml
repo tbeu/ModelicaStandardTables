@@ -53,7 +53,7 @@ before_script:
   - cd ../BuildProjects/gcc
 
 script:
-  - make
+  - if [[ "$COVERITY_SCAN_BRANCH" != 1 ]]; then make; fi
 
 notifications:
   email: false
