@@ -5,7 +5,7 @@ data from Text or MATLAB MAT-files, interpolation and extrapolation.
 The library was presented at the [10th International Modelica Conference] (https://modelica.org/events/modelica2014/proceedings/html/sessions/session_5E.html). Detailed remarks on the implementation can be found in the [article](http://dx.doi.org/10.3384/ecp14096893).
 
 ## Build status
-[![Build Status](https://drone.io/github.com/tbeu/ModelicaStandardTables/status.png)](https://drone.io/github.com/tbeu/ModelicaStandardTables/latest)
+[![Build Status](https://drone.io/github.com/tbeu/ModelicaStandardTables/status.png)](https://drone.io/github.com/tbeu/ModelicaStandardTables/latest) [![Build Status](https://travis-ci.org/tbeu/ModelicaStandardTables.svg?branch=master)](https://travis-ci.org/tbeu/ModelicaStandardTables)
 
 ## License
 ModelicaStandardTables is released under the terms of the Simplified BSD License.
