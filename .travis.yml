@@ -1,0 +1,50 @@
+language: c
+
+os:
+  - linux
+  - osx
+
+git:
+  depth: 1
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - gcc-4.8-multilib
+
+compiler:
+  - gcc-4.8
+  - clang
+
+env:
+  global:
+    - CFLAGS="-O3 -fPIC"
+  matrix:
+    - CPPFLAGS="-DNO_TABLE_COPY"
+    - CPPFLAGS="-DDEBUG_TIME_EVENTS"
+    - CPPFLAGS="-UHAVE_ZLIB"
+    - CPPFLAGS="-DHAVE_HDF5=1"
+   
+before install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
+
+script:
+  - svn co -q https://svn.hdfgroup.uiuc.edu/hdf5/branches/hdf5_1_8_16@28320
+  - cd hdf5_1_8_16
+  - ./configure --quiet --enable-shared --enable-production --enable-debug=no --with-pic --disable-deprecated-symbols --disable-hl --with-default-api-version=v18 CFLAGS="-O3 -w" CPPFLAGS="-DNDEBUG"
+  - make
+  - make install
+  - cd $TRAVIS_BUILD_DIR
+  - mkdir Library
+  - cd Library
+  - mkdir linux64
+  - cd ../BuildProjects/gcc
+  - make
+# deployment rules are currently missing but can be added for, e.g, github releases
+
+notifications:
+  email: false
+
+sudo: false
