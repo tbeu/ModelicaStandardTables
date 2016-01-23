@@ -4175,6 +4175,9 @@ static double* readTable(const char* tableName, const char* fileName,
                     table = readTxtTable(tableName, fileName, nRow, nCol);
                 }
                 if (table == NULL) {
+#if defined(TABLE_SHARE)
+                    free(key);
+#endif
                     return table;
                 }
 #if defined(TABLE_SHARE)
