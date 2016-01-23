@@ -4267,8 +4267,8 @@ static double* readMatTable(const char* tableName, const char* fileName,
             free(tableNameCopy);
             (void)Mat_Close(mat);
             ModelicaFormatError(
-                "Table matrix \"%s\" not found on file \"%s\".\n", tableName,
-                fileName);
+                "Table variable \"%s\" not found on file \"%s\".\n",
+                token == NULL ? tableName : token, fileName);
             return NULL;
         }
 
@@ -4282,6 +4282,15 @@ static double* readMatTable(const char* tableName, const char* fileName,
             token = strtok(NULL, ".");
         }
         free(tableNameCopy);
+
+        if (matvar == NULL) {
+            Mat_VarFree(matvarRoot);
+            (void)Mat_Close(mat);
+            ModelicaFormatError(
+                "Table matrix \"%s\" not found on file \"%s\".\n", tableName,
+                fileName);
+            return NULL;
+        }
 
         /* Check if matvar is a matrix */
         if (matvar->rank != 2) {
