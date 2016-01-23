@@ -4193,6 +4193,9 @@ static double* readTable(const char* tableName, const char* fileName,
                     iter->table = table;
                     HASH_ADD_KEYPTR(hh, tableShare, key, strlen(key), iter);
                 }
+                else {
+                    free(key);
+                }
             }
             else if (force) {
                 /* Share hit -> Update table share (only if not shared
