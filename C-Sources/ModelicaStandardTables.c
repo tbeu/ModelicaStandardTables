@@ -4198,6 +4198,7 @@ static double* readTable(const char* tableName, const char* fileName,
                 /* Share hit -> Update table share (only if not shared
                    by multiple table objects)
                 */
+                free(key);
                 if (iter->refCount == 1) {
                     free(iter->table);
                     iter->nRow = *nRow;
@@ -4212,6 +4213,7 @@ static double* readTable(const char* tableName, const char* fileName,
                 /* Share hit -> Read from table share and increment table
                    reference counter
                 */
+                free(key);
                 if (table != NULL) {
                     free(table);
                 }
