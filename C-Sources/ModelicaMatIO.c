@@ -287,6 +287,9 @@
 #undef Z_PREFIX
 
 #include "ModelicaMatIO.h"
+#if HAVE_INTTYPES_H
+#   define __STDC_FORMAT_MACROS
+#endif
 #if defined(HAVE_ZLIB)
 #   include <zlib.h>
 #endif
@@ -1693,9 +1696,6 @@ Mat_SizeOf(enum matio_types data_type)
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
-#if defined(HAVE_ZLIB)
-#   include <zlib.h>
-#endif
 
 /*
  * --------------------------------------------------------------------------
@@ -7672,15 +7672,15 @@ static mat_t *Mat_Create5(const char *matname,const char *hdr_str);
 static matvar_t *Mat_VarReadNextInfo5( mat_t *mat );
 static void      Read5(mat_t *mat, matvar_t *matvar);
 static int       ReadData5(mat_t *mat,matvar_t *matvar,void *data,
-              int *start,int *stride,int *edge);
+                     int *start,int *stride,int *edge);
 static int       Mat_VarReadDataLinear5(mat_t *mat,matvar_t *matvar,void *data,
-              int start,int stride,int edge);
+                     int start,int stride,int edge);
 static int       Mat_VarWrite5(mat_t *mat,matvar_t *matvar,int compress);
 static int       WriteCharDataSlab2(mat_t *mat,void *data,enum matio_types data_type,
-              size_t *dims,int *start,int *stride,int *edge);
+                     size_t *dims,int *start,int *stride,int *edge);
 static int       WriteData(mat_t *mat,void *data,int N,enum matio_types data_type);
 static int       WriteDataSlab2(mat_t *mat,void *data,enum matio_types data_type,
-              size_t *dims,int *start,int *stride,int *edge);
+                     size_t *dims,int *start,int *stride,int *edge);
 static void      WriteInfo5(mat_t *mat, matvar_t *matvar);
 
 #endif
@@ -7688,14 +7688,13 @@ static void      WriteInfo5(mat_t *mat, matvar_t *matvar);
 #ifndef MAT4_H
 #define MAT4_H
 
-static mat_t *Mat_Create4(const char* matname);
-static int  Mat_VarWrite4(mat_t *mat,matvar_t *matvar);
-static void Read4(mat_t *mat, matvar_t *matvar);
-static int  ReadData4(mat_t *mat,matvar_t *matvar,void *data,
-         int *start,int *stride,int *edge);
-static int  Mat_VarReadDataLinear4(mat_t *mat,matvar_t *matvar,void *data,int start,
-         int stride,int edge);
-
+static mat_t    *Mat_Create4(const char* matname);
+static int       Mat_VarWrite4(mat_t *mat,matvar_t *matvar);
+static void      Read4(mat_t *mat, matvar_t *matvar);
+static int       ReadData4(mat_t *mat,matvar_t *matvar,void *data,
+                     int *start,int *stride,int *edge);
+static int       Mat_VarReadDataLinear4(mat_t *mat,matvar_t *matvar,void *data,
+                     int start,int stride,int edge);
 static matvar_t *Mat_VarReadNextInfo4(mat_t *mat);
 
 #endif
@@ -7703,10 +7702,7 @@ static matvar_t *Mat_VarReadNextInfo4(mat_t *mat);
 #ifndef MAT73_H
 #define MAT73_H
 
-#include <hdf5.h>
-
 static mat_t    *Mat_Create73(const char *matname,const char *hdr_str);
-
 static void      Mat_VarRead73(mat_t *mat,matvar_t *matvar);
 static int       Mat_VarReadData73(mat_t *mat,matvar_t *matvar,void *data,
                      int *start,int *stride,int *edge);
@@ -17800,8 +17796,6 @@ Mat_VarReadNextInfo5( mat_t *mat )
 #include <time.h>
 
 #if defined(HAVE_HDF5)
-
-#include <hdf5.h>
 
 static const char *Mat_class_names[] = {
     "",
