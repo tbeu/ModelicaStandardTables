@@ -25,6 +25,24 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/* The functions in this file are non-portable. The following #define's are used
+   to define the system calls of the operating system
+
+   __GNUC__       : GNU C compiler
+   NO_FILE_SYSTEM : A file system is not present (e.g. on dSPACE or xPC).
+   MODELICA_EXPORT: Prefix used for function calls. If not defined, blank is used
+                    Useful definitions:
+                    - "static" that is all functions become static
+                      (useful if file is included with other C-sources for an
+                       embedded system)
+                    - "__declspec(dllexport)" if included in a DLL and the
+                      functions shall be visible outside of the DLL
+
+   Release Notes:
+      Mar. 03, 2016: by Thomas Beutlich, ITI GmbH and Martin Otter, DLR
+                     Implemented a first version (ticket #1856)
+*/
+
 #if !defined(MODELICA_EXPORT)
   #define MODELICA_EXPORT
 #endif
@@ -342,7 +360,7 @@ MODELICA_EXPORT int ModelicaIO_writeRealMatrix(const char* fileName,
         matc = MAT_COMPRESSION_NONE;
     }
 
-    if ( append == 0 ) {
+    if (append == 0) {
         mat = Mat_CreateVer(fileName, NULL, matv);
         if (mat == NULL) {
             ModelicaFormatError("Not possible to newly create file \"%s\"\n(maybe version 7.3 not supported)\n", fileName);
@@ -354,6 +372,12 @@ MODELICA_EXPORT int ModelicaIO_writeRealMatrix(const char* fileName,
             ModelicaFormatError("Not possible to open file \"%s\"\n", fileName);
             return 0;
         }
+    }
+
+    if (matv != Mat_GetVersion(mat)) {
+        (void)Mat_Close(mat);
+        ModelicaFormatError("File \"%s\" is not of version %s\n", fileName, version);
+        return 0;
     }
 
     /* MAT file array is stored column-wise -> need to transpose */
