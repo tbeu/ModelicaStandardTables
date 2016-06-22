@@ -44,11 +44,11 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
 
 install:
-  - svn co -q https://svn.hdfgroup.uiuc.edu/hdf5/branches/hdf5_1_8_16@28320
-  - cd hdf5_1_8_16
+  - svn co -q https://svn.hdfgroup.org/hdf5/branches/hdf5_1_8_17@29907
+  - cd hdf5_1_8_17
   - ./configure --quiet --enable-shared --enable-production --enable-debug=no --with-pic --disable-deprecated-symbols --disable-hl --with-default-api-version=v18 CFLAGS="-O3 -w" CPPFLAGS="-DNDEBUG"
   - make
-  - make install
+  - make install -C src
   - cd $TRAVIS_BUILD_DIR
 
 before_script:
