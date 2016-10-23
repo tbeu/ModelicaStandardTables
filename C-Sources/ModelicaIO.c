@@ -374,12 +374,6 @@ MODELICA_EXPORT int ModelicaIO_writeRealMatrix(const char* fileName,
         }
     }
 
-    if (matv != Mat_GetVersion(mat)) {
-        (void)Mat_Close(mat);
-        ModelicaFormatError("File \"%s\" is not of version %s\n", fileName, version);
-        return 0;
-    }
-
     /* MAT file array is stored column-wise -> need to transpose */
     aT = (double*)malloc(m*n*sizeof(double));
     if (aT == NULL) {
