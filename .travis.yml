@@ -29,7 +29,7 @@ compiler:
 matrix:
   exclude:
     - os: osx
-      compiler: gcc
+      compiler: gcc-4.8
   
 env:
   global:
