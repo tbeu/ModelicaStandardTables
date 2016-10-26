@@ -14791,7 +14791,7 @@ Read5(mat_t *mat, matvar_t *matvar)
             }
             break;
         case MAT_C_INT64:
-#ifdef HAVE_MAT_INT64_T
+#ifdef HAVE_MATIO_INT64_T
             (void)fseek((FILE*)mat->fp,matvar->internal->datapos,SEEK_SET);
             matvar->data_size = sizeof(mat_int64_t);
             matvar->data_type = MAT_T_INT64;
@@ -14819,7 +14819,7 @@ Read5(mat_t *mat, matvar_t *matvar)
 #endif
             break;
         case MAT_C_UINT64:
-#ifdef HAVE_MAT_UINT64_T
+#ifdef HAVE_MATIO_UINT64_T
             (void)fseek((FILE*)mat->fp,matvar->internal->datapos,SEEK_SET);
             matvar->data_size = sizeof(mat_uint64_t);
             matvar->data_type = MAT_T_UINT64;
