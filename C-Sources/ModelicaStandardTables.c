@@ -36,6 +36,7 @@
    The following #define's are available.
 
    NO_FILE_SYSTEM        : A file system is not present (e.g. on dSPACE or xPC).
+   NO_LOCALE             : locale.h is not present (e.g. on AVR).
    DEBUG_TIME_EVENTS     : Trace time events of CombiTimeTable
    DUMMY_FUNCTION_USERTAB: Use a dummy function "usertab"
    NO_TABLE_COPY         : Do not copy table data passed to _init functions
@@ -46,6 +47,12 @@
                            utilized memory (tickets #1110 and #1550).
 
    Release Notes:
+      Nov. 23, 2016: by Martin Sjölund, SICS East Swedish ICT AB
+                     Added NO_LOCALE define flag, in case the OS does
+                     not have this (for example when using GCC compiler,
+                     but not libc). Also added autoconf detection for
+                     this flag, NO_PID, NO_TIME, and NO_FILE_SYSTEM
+
       Nov. 21, 2016: by Thomas Beutlich, ESI ITI GmbH
                      Fixed error handling if a table variable cannot be found in a
                      MATLAB MAT-file (ticket #2119)
@@ -124,7 +131,9 @@
 #include "ModelicaUtilities.h"
 #if !defined(NO_FILE_SYSTEM)
 #include <stdio.h>
+#if !defined(NO_LOCALE)
 #include <locale.h>
+#endif
 #include "ModelicaMatIO.h"
 #if defined(TABLE_SHARE)
 #define uthash_fatal(msg) ModelicaFormatMessage("Error: %s\n", msg); break
@@ -4437,7 +4446,9 @@ static double* readTxtTable(const char* tableName, const char* fileName,
         unsigned long nRow = 0;
         unsigned long nCol = 0;
         unsigned long lineNo = 1;
-#if defined(_MSC_VER) && _MSC_VER >= 1400
+#if defined(NO_LOCALE)
+        const char * const dec = ".";
+#elif defined(_MSC_VER) && _MSC_VER >= 1400
         _locale_t loc;
 #elif defined(__GLIBC__) && defined(__GLIBC_MINOR__) && ((__GLIBC__ << 16) + __GLIBC_MINOR__ >= (2 << 16) + 3)
         locale_t loc;
@@ -4501,7 +4512,8 @@ static double* readTxtTable(const char* tableName, const char* fileName,
             return NULL;
         }
 
-#if defined(_MSC_VER) && _MSC_VER >= 1400
+#if defined(NO_LOCALE)
+#elif defined(_MSC_VER) && _MSC_VER >= 1400
         loc = _create_locale(LC_NUMERIC, "C");
 #elif defined(__GLIBC__) && defined(__GLIBC_MINOR__) && ((__GLIBC__ << 16) + __GLIBC_MINOR__ >= (2 << 16) + 3)
         loc = newlocale(LC_NUMERIC, "C", NULL);
@@ -4537,9 +4549,9 @@ static double* readTxtTable(const char* tableName, const char* fileName,
             if (token == NULL) {
                 continue;
             }
-#if defined(_MSC_VER) && _MSC_VER >= 1400
+#if !defined(NO_LOCALE) && (defined(_MSC_VER) && _MSC_VER >= 1400)
             nRow = (unsigned long)_strtol_l(token, &endptr, 10, loc);
-#elif defined(__GLIBC__) && defined(__GLIBC_MINOR__) && ((__GLIBC__ << 16) + __GLIBC_MINOR__ >= (2 << 16) + 3)
+#elif !defined(NO_LOCALE) && (defined(__GLIBC__) && defined(__GLIBC_MINOR__) && ((__GLIBC__ << 16) + __GLIBC_MINOR__ >= (2 << 16) + 3))
             nRow = (unsigned long)strtol_l(token, &endptr, 10, loc);
 #else
             nRow = (unsigned long)strtol(token, &endptr, 10);
@@ -4551,9 +4563,9 @@ static double* readTxtTable(const char* tableName, const char* fileName,
             if (token == NULL) {
                 continue;
             }
-#if defined(_MSC_VER) && _MSC_VER >= 1400
+#if !defined(NO_LOCALE) && (defined(_MSC_VER) && _MSC_VER >= 1400)
             nCol = (unsigned long)_strtol_l(token, &endptr, 10, loc);
-#elif defined(__GLIBC__) && defined(__GLIBC_MINOR__) && ((__GLIBC__ << 16) + __GLIBC_MINOR__ >= (2 << 16) + 3)
+#elif !defined(NO_LOCALE) && (defined(__GLIBC__) && defined(__GLIBC_MINOR__) && ((__GLIBC__ << 16) + __GLIBC_MINOR__ >= (2 << 16) + 3))
             nCol = (unsigned long)strtol_l(token, &endptr, 10, loc);
 #else
             nCol = (unsigned long)strtol(token, &endptr, 10);
@@ -4572,7 +4584,8 @@ static double* readTxtTable(const char* tableName, const char* fileName,
                     *_nCol = 0;
                     free(buf);
                     fclose(fp);
-#if defined(_MSC_VER) && _MSC_VER >= 1400
+#if defined(NO_LOCALE)
+#elif defined(_MSC_VER) && _MSC_VER >= 1400
                     _free_locale(loc);
 #elif defined(__GLIBC__) && defined(__GLIBC_MINOR__) && ((__GLIBC__ << 16) + __GLIBC_MINOR__ >= (2 << 16) + 3)
                     freelocale(loc);
@@ -4606,12 +4619,12 @@ static double* readTxtTable(const char* tableName, const char* fileName,
                             /* Skip trailing comment line */
                             break;
                         }
-#if defined(_MSC_VER) && _MSC_VER >= 1400
+#if !defined(NO_LOCALE) && (defined(_MSC_VER) && _MSC_VER >= 1400)
                         TABLE(i, j) = _strtod_l(token, &endptr, loc);
                         if (*endptr != 0) {
                             tableReadError = 1;
                         }
-#elif defined(__GLIBC__) && defined(__GLIBC_MINOR__) && ((__GLIBC__ << 16) + __GLIBC_MINOR__ >= (2 << 16) + 3)
+#elif !defined(NO_LOCALE) && (defined(__GLIBC__) && defined(__GLIBC_MINOR__) && ((__GLIBC__ << 16) + __GLIBC_MINOR__ >= (2 << 16) + 3))
                         TABLE(i, j) = strtod_l(token, &endptr, loc);
                         if (*endptr != 0) {
                             tableReadError = 1;
@@ -4711,7 +4724,8 @@ static double* readTxtTable(const char* tableName, const char* fileName,
 
         free(buf);
         fclose(fp);
-#if defined(_MSC_VER) && _MSC_VER >= 1400
+#if defined(NO_LOCALE)
+#elif defined(_MSC_VER) && _MSC_VER >= 1400
         _free_locale(loc);
 #elif defined(__GLIBC__) && defined(__GLIBC_MINOR__) && ((__GLIBC__ << 16) + __GLIBC_MINOR__ >= (2 << 16) + 3)
         freelocale(loc);
