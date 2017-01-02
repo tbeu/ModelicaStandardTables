@@ -58,7 +58,7 @@ before_script:
   - cd ../BuildProjects/gcc
 
 script:
-  - if [[ "$COVERITY_SCAN_BRANCH" != 1 ]]; then make; fi
+  - if [[ "$COVERITY_SCAN_BRANCH" != 1 ]]; then make CPPFLAGS="-DNDEBUG -DHAVE_UNISTD_H -DHAVE_STDARG_H -DHAVE_HIDDEN -DHAVE_MEMCPY"; fi
 
 notifications:
   email: false
