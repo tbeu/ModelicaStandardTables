@@ -47,6 +47,15 @@
                            utilized memory (tickets #1110 and #1550).
 
    Release Notes:
+      Jan. 31, 2017: by Thomas Beutlich, ESI ITI GmbH
+                     Added diagnostic message for (supported) partial read of table
+                     from ASCII text file (ticket #2151)
+
+      Jan. 27, 2017: by Thomas Beutlich, ESI ITI GmbH
+                     Always generate time events for CombiTimeTable with linear
+                     interpolation (analogously to constant segments)
+                     (tickets #1627 and #2080)
+
       Jan. 07, 2017: by Thomas Beutlich, ESI ITI GmbH
                      Replaced strtok by re-entrant string tokenize function
                      (ticket #1153)
@@ -114,6 +123,8 @@
 
       May 21, 2014:  by Thomas Beutlich, ITI GmbH
                      Fixed bivariate Akima-spline extrapolation (ticket #1465)
+                     Improved error message in case of trailing numbers when parsing
+                     a line of an external ASCII text file (ticket #1494)
 
       Oct. 17, 2013: by Thomas Beutlich, ITI GmbH
                      Added support of 2D tables that actually degrade to 1D tables
@@ -459,6 +470,9 @@ static double* readTxtTable(_In_z_ const char* tableName, _In_z_ const char* fil
 
 static int readLine(_In_ char** buf, _In_ int* bufLen, _In_ FILE* fp) MODELICA_NONNULLATTR;
   /* Read line (of unknown and arbitrary length) from an ASCII text file */
+
+static int IsNumber(char* token);
+  /*  Check, whether a token represents a floating-point number */
 #endif /* #if !defined(NO_FILE_SYSTEM) */
 
 static CubicHermite1D* akimaSpline1DInit(_In_ const double* table, size_t nRow,
@@ -1385,19 +1399,16 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
 
             /* There is at least one time event at the interval boundaries */
             tableID->maxEvents = 1;
-            for (i = 0; i < nRow - 1; i++) {
-                double t0 = TABLE_COL0(i);
-                double t1 = TABLE_COL0(i + 1);
-                if (t1 > tEvent && !isNearlyEqual(t1, tMax)) {
-                    if (tableID->smoothness == CONSTANT_SEGMENTS) {
+            if (tableID->smoothness == LINEAR_SEGMENTS ||
+                tableID->smoothness == CONSTANT_SEGMENTS) {
+                for (i = 0; i < nRow - 1; i++) {
+                    double t0 = TABLE_COL0(i);
+                    double t1 = TABLE_COL0(i + 1);
+                    if (t1 > tEvent && !isNearlyEqual(t1, tMax)) {
                         if (!isNearlyEqual(t0, t1)) {
                             tEvent = t1;
                             tableID->maxEvents++;
                         }
-                    }
-                    else if (isNearlyEqual(t0, t1)) {
-                        tEvent = t1;
-                        tableID->maxEvents++;
                     }
                 }
             }
@@ -1411,7 +1422,8 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
 
             tEvent = TABLE_ROW0(0);
             eventInterval = 0;
-            if (tableID->smoothness == CONSTANT_SEGMENTS) {
+            if (tableID->smoothness == LINEAR_SEGMENTS ||
+                tableID->smoothness == CONSTANT_SEGMENTS) {
                 for (i = 0; i < nRow - 1 &&
                     eventInterval < tableID->maxEvents; i++) {
                     double t0 = TABLE_COL0(i);
@@ -1429,29 +1441,6 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
                     }
                     else {
                         tableID->intervals[eventInterval][1] = i + 1;
-                    }
-                }
-            }
-            else {
-                for (i = 0; i < nRow - 1 &&
-                    eventInterval < tableID->maxEvents; i++) {
-                    double t0 = TABLE_COL0(i);
-                    double t1 = TABLE_COL0(i + 1);
-                    if (t1 > tEvent) {
-                        if (isNearlyEqual(t0, t1)) {
-                            tEvent = t1;
-                            tableID->intervals[eventInterval][1] = i;
-                            eventInterval++;
-                            if (eventInterval < tableID->maxEvents) {
-                                tableID->intervals[eventInterval][0] = i + 1;
-                            }
-                        }
-                        else {
-                            tableID->intervals[eventInterval][1] = i + 1;
-                        }
-                    }
-                    else {
-                        tableID->intervals[eventInterval][0] = i + 1;
                     }
                 }
             }
@@ -1516,34 +1505,25 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
                     iEnd = iStart < (nRow - 1) ? iStart : (nRow - 1);
                 }
 
-                for (i = iStart + 1; i < nRow - 1; i++) {
-                    double t0 = TABLE_COL0(i);
-                    double t1 = TABLE_COL0(i + 1);
-                    if (t0 > t) {
-                        if (tableID->smoothness == CONSTANT_SEGMENTS) {
-                            nextTimeEvent = t0;
-                            break;
-                        }
-                        else if (isNearlyEqual(t0, t1)) {
+                if (tableID->smoothness == LINEAR_SEGMENTS ||
+                    tableID->smoothness == CONSTANT_SEGMENTS) {
+                    for (i = iStart + 1; i < nRow - 1; i++) {
+                        double t0 = TABLE_COL0(i);
+                        double t1 = TABLE_COL0(i + 1);
+                        if (t0 > t) {
                             nextTimeEvent = t0;
                             break;
                         }
                     }
-                }
 
-                for (i = 0; i < iEnd; i++) {
-                    double t0 = TABLE_COL0(i);
-                    double t1 = TABLE_COL0(i + 1);
-                    if (t1 > tEvent && !isNearlyEqual(t1, tMax)) {
-                        if (tableID->smoothness == CONSTANT_SEGMENTS) {
+                    for (i = 0; i < iEnd; i++) {
+                        double t0 = TABLE_COL0(i);
+                        double t1 = TABLE_COL0(i + 1);
+                        if (t1 > tEvent && !isNearlyEqual(t1, tMax)) {
                             if (!isNearlyEqual(t0, t1)) {
                                 tEvent = t1;
                                 tableID->eventInterval++;
                             }
-                        }
-                        else if (isNearlyEqual(t0, t1)) {
-                            tEvent = t1;
-                            tableID->eventInterval++;
                         }
                     }
                 }
@@ -1600,8 +1580,10 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
 
 #if defined(DEBUG_TIME_EVENTS)
         if (nextTimeEvent < DBL_MAX) {
-            ModelicaFormatMessage("At time %.17lg: %lu. time event at %.17lg\n", t,
-                (unsigned long)tableID->nEvent, nextTimeEvent);
+            ModelicaFormatMessage("At time %.17lg (interval %lu of %lu): %lu. "
+                "time event at %.17lg\n", t, (unsigned long)tableID->eventInterval,
+                (unsigned long)tableID->maxEvents, (unsigned long)tableID->nEvent,
+                nextTimeEvent);
         }
         else {
             ModelicaFormatMessage("No more time events for time > %.17lg\n", t);
@@ -4455,6 +4437,46 @@ static double* readMatTable(const char* tableName, const char* fileName,
 #define DELIM_TABLE_HEADER " \t(,)\r"
 #define DELIM_TABLE_NUMBER " \t,;\r"
 
+static int IsNumber(char* token) {
+    int foundExponentSign = 0;
+    int foundExponent = 0;
+    int foundDec = 0;
+    int isNumber = 1;
+    int k = 0;
+
+    if (token[0] == '-' || token[0] == '+') {
+        k = 1;
+    }
+    else {
+        k = 0;
+    }
+    while (token[k] != '\0') {
+        if (token[k] >= '0' && token[k] <= '9') {
+            k++;
+        }
+        else if (token[k] == '.' && foundDec == 0 &&
+            foundExponent == 0 && foundExponentSign == 0) {
+            foundDec = 1;
+            k++;
+        }
+        else if ((token[k] == 'e' || token[k] == 'E') &&
+            foundExponent == 0) {
+            foundExponent = 1;
+            k++;
+        }
+        else if ((token[k] == '-' || token[k] == '+') &&
+            foundExponent == 1 && foundExponentSign == 0) {
+            foundExponentSign = 1;
+            k++;
+        }
+        else {
+            isNumber = 0;
+            break;
+        }
+    }
+    return isNumber;
+}
+
 static double* readTxtTable(const char* tableName, const char* fileName,
                             size_t* _nRow, size_t* _nCol) {
     double* table = NULL;
@@ -4698,45 +4720,47 @@ static double* readTxtTable(const char* tableName, const char* fileName,
                     }
                     /* Check for trailing non-comment character */
                     if (token != NULL && token[0] != '#') {
-                        /* Check for trailing number */
-                        if (i == nRow) {
-                            int foundExponentSign = 0;
-                            int foundExponent = 0;
-                            int foundDec = 0;
+                        tableReadError = 1;
+                        /* Check for trailing number (on same line) */
+                        if (i == nRow && 1 == IsNumber(token)) {
                             tableReadError = 2;
-                            if (token[0] == '+' || token[0] == '-') {
-                                k = 1;
-                            }
-                            else {
-                                k = 0;
-                            }
-                            while (token[k] != '\0') {
-                                if (token[k] >= '0' && token[k] <= '9') {
-                                    k++;
-                                }
-                                else if (token[k] == '.' && foundDec == 0 &&
-                                    foundExponent == 0 && foundExponentSign == 0) {
-                                    foundDec = 1;
-                                    k++;
-                                }
-                                else if ((token[k] == 'e' || token[k] == 'E') &&
-                                    foundExponent == 0) {
-                                    foundExponent = 1;
-                                    k++;
-                                }
-                                else if ((token[k] == '+' || token[k] == '-') &&
-                                    foundExponent == 1 && foundExponentSign == 0) {
-                                    foundExponentSign = 1;
-                                    k++;
-                                }
-                                else {
-                                    tableReadError = 1;
+                        }
+                        break;
+                    }
+                    /* Extra check for partial table read */
+                    else if (NULL == token && 0 == tableReadError && i == nRow) {
+                        unsigned long lineNoPartial = lineNo;
+                        int tableReadPartial = 0;
+                        while (readLine(&buf, &bufLen, fp) == 0) {
+                            lineNoPartial++;
+                            /* Ignore leading white space */
+                            while (k < bufLen - 1) {
+                                if (buf[k] != ' ' && buf[k] != '\t') {
                                     break;
                                 }
+                                k++;
                             }
+                            if (buf[k] == '\0' || buf[k] == '#') {
+                                /* Skip empty or comment line */
+                                continue;
+                            }
+                            nextToken = NULL;
+                            token = strtok_r(&buf[k], DELIM_TABLE_NUMBER, &nextToken);
+                            if (NULL != token) {
+                                if (1 == IsNumber(token)) {
+                                    tableReadPartial = 1;
+                                }
+                                /* Else, it is not a number: No further check
+                                   is performed, if legal or not
+                                */
+                            }
+                            break;
                         }
-                        else {
-                            tableReadError = 1;
+                        if (1 == tableReadPartial) {
+                            ModelicaFormatMessage(
+                                "The table dimensions of matrix \"%s(%lu,%lu)\" from file "
+                                "\"%s\" do not match the actual table size (line %lu).\n",
+                                tableName, nRow, nCol, fileName, lineNoPartial);
                         }
                         break;
                     }
@@ -4778,8 +4802,8 @@ static double* readTxtTable(const char* tableName, const char* fileName,
             else if (tableReadError == 2) {
                 ModelicaFormatError(
                     "The table dimensions of matrix \"%s(%lu,%lu)\" from file "
-                    "\"%s\" do not match the actual table size.\n", tableName,
-                    nRow, nCol, fileName);
+                    "\"%s\" do not match the actual table size (line %lu).\n",
+                    tableName, nRow, nCol, fileName, lineNo);
             }
             else {
                 ModelicaFormatError(
