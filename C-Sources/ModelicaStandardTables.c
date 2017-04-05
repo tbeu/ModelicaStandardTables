@@ -33,19 +33,11 @@
       Modelica.Blocks.Tables.CombiTable1Ds
       Modelica.Blocks.Tables.CombiTable2D
 
-   The following #define's are available.
-
-   NO_FILE_SYSTEM        : A file system is not present (e.g. on dSPACE or xPC).
-   DEBUG_TIME_EVENTS     : Trace time events of CombiTimeTable
-   DUMMY_FUNCTION_USERTAB: Use a dummy function "usertab"
-   NO_TABLE_COPY         : Do not copy table data passed to _init functions
-                           This is a potentially unsafe optimization (ticket #1143).
-   TABLE_SHARE           : If NO_FILE_SYTEM is not defined then common/shared table
-                           arrays are stored in a global hash table in order to
-                           avoid superfluous file input access and to decrease the
-                           utilized memory (tickets #1110 and #1550).
-
    Release Notes:
+      Apr. 05, 2017: by Thomas Beutlich, ESI ITI GmbH
+                     Fixed extrapolation of CombiTimeTable if simulation start
+                     time equals the maximum time of the table (ticket #2233)
+
       Mar. 08, 2017: by Thomas Beutlich, ESI ITI GmbH
                      Moved file I/O functions to ModelicaIO (ticket #2192)
 
@@ -722,7 +714,7 @@ void ModelicaStandardTables_CombiTimeTable_close(void* _tableID) {
         if (tableID->table != NULL && tableID->source == TABLESOURCE_FILE) {
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
             if (tableID->tableName != NULL && tableID->fileName != NULL) {
-                char* key = malloc((strlen(tableID->tableName) +
+                char* key = (char*)malloc((strlen(tableID->tableName) +
                     strlen(tableID->fileName) + 2)*sizeof(char));
                 if (key != NULL) {
                     TableShare *iter;
@@ -1423,7 +1415,7 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
                 const double tOld = t;
 #endif
                 double tEvent = tMin;
-                size_t i, iStart, iEnd;
+                size_t iStart, iEnd;
 
                 t -= tableID->startTime;
                 if (tableID->extrapolation == PERIODIC) {
@@ -1442,7 +1434,7 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
                     tableID->eventInterval = 1;
                     iEnd = iStart < (nRow - 1) ? iStart : (nRow - 1);
                 }
-                else if (t > tMax) {
+                else if (t >= tMax) {
                     iStart = nRow - 1;
                     tableID->eventInterval = tableID->maxEvents + 1;
                     iEnd = 0;
@@ -1470,6 +1462,7 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
 
                 if (tableID->smoothness == LINEAR_SEGMENTS ||
                     tableID->smoothness == CONSTANT_SEGMENTS) {
+                    size_t i;
                     for (i = iStart + 1; i < nRow - 1; i++) {
                         double t0 = TABLE_COL0(i);
                         if (t0 > t) {
@@ -1542,10 +1535,23 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
 
 #if defined(DEBUG_TIME_EVENTS)
         if (nextTimeEvent < DBL_MAX) {
-            ModelicaFormatMessage("At time %.17lg (interval %lu of %lu): %lu. "
-                "time event at %.17lg\n", t, (unsigned long)tableID->eventInterval,
-                (unsigned long)tableID->maxEvents, (unsigned long)tableID->nEvent,
-                nextTimeEvent);
+            if (tableID->extrapolation == PERIODIC) {
+                ModelicaFormatMessage("At time %.17lg (interval %lu of %lu): %lu. "
+                    "time event at %.17lg\n", t, (unsigned long)tableID->eventInterval,
+                    (unsigned long)tableID->maxEvents, (unsigned long)tableID->nEvent,
+                    nextTimeEvent);
+            }
+            else if (tableID->eventInterval > 0) {
+                ModelicaFormatMessage("At time %.17lg (interval %lu of %lu): %lu. "
+                    "time event at %.17lg\n", t, (unsigned long)tableID->eventInterval - 1,
+                    (unsigned long)tableID->maxEvents, (unsigned long)tableID->nEvent,
+                    nextTimeEvent);
+            }
+            else {
+                ModelicaFormatMessage("At time %.17lg: %lu. "
+                    "time event at %.17lg\n", t, (unsigned long)tableID->nEvent,
+                    nextTimeEvent);
+            }
         }
         else {
             ModelicaFormatMessage("No more time events for time > %.17lg\n", t);
@@ -1889,7 +1895,7 @@ void ModelicaStandardTables_CombiTable1D_close(void* _tableID) {
         if (tableID->table != NULL && tableID->source == TABLESOURCE_FILE) {
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
             if (tableID->tableName != NULL && tableID->fileName != NULL) {
-                char* key = malloc((strlen(tableID->tableName) +
+                char* key = (char*)malloc((strlen(tableID->tableName) +
                     strlen(tableID->fileName) + 2)*sizeof(char));
                 if (key != NULL) {
                     TableShare *iter;
@@ -2460,7 +2466,7 @@ void ModelicaStandardTables_CombiTable2D_close(void* _tableID) {
         if (tableID->table != NULL && tableID->source == TABLESOURCE_FILE) {
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
             if (tableID->tableName != NULL && tableID->fileName != NULL) {
-                char* key = malloc((strlen(tableID->tableName) +
+                char* key = (char*)malloc((strlen(tableID->tableName) +
                     strlen(tableID->fileName) + 2)*sizeof(char));
                 if (key != NULL) {
                     TableShare *iter;
@@ -4307,7 +4313,7 @@ static double* readTable(_In_z_ const char* tableName, _In_z_ const char* fileNa
     double* table = NULL;
     if (tableName != NULL && fileName != NULL && nRow != NULL && nCol != NULL) {
 #if defined(TABLE_SHARE)
-        char* key = malloc((strlen(tableName) +
+        char* key = (char*)malloc((strlen(tableName) +
             strlen(fileName) + 2)*sizeof(char));
         if (key != NULL) {
             int updateError = 0;
@@ -4338,7 +4344,7 @@ static double* readTable(_In_z_ const char* tableName, _In_z_ const char* fileNa
             }
             if (iter == NULL) {
                 /* Share miss -> Insert new table */
-                iter = malloc(sizeof(TableShare));
+                iter = (TableShare*)malloc(sizeof(TableShare));
                 if (iter != NULL) {
                     iter->key = key;
                     iter->refCount = 1;
