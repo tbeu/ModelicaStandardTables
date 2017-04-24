@@ -268,6 +268,7 @@ typedef struct CombiTable2D {
     size_t last1; /* Last accessed row index of table */
     size_t last2; /* Last accessed column index of table */
     enum Smoothness smoothness; /* Smoothness kind */
+    enum Extrapolation extrapolation; /* Extrapolation kind */
     enum TableSource source; /* Source kind */
     CubicHermite2D* spline; /* Pre-calculated cubic Hermite spline coefficients,
         only used if smoothness is AKIMA_C1 */
@@ -621,9 +622,11 @@ void* ModelicaStandardTables_CombiTimeTable_init2(_In_z_ const char* fileName,
                 }
                 else {
                     /* Need to transpose */
-                    double* tableT = (double*)malloc(dim[0]*dim[1]*sizeof(double));
+                    double* tableT = (double*)malloc(
+                        (size_t)dim[0]*(size_t)dim[1]*sizeof(double));
                     if (NULL != tableT) {
-                        memcpy(tableT, tableID->table, dim[0]*dim[1]*sizeof(double));
+                        memcpy(tableT, tableID->table,
+                            (size_t)dim[0]*(size_t)dim[1]*sizeof(double));
                         tableID->table = tableT;
                         tableID->nRow = (size_t)dim[1];
                         tableID->nCol = (size_t)dim[0];
@@ -939,7 +942,7 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                         case STEFFEN_MONOTONE_C1:
                             if (NULL != tableID->spline) {
                                 const double* c = tableID->spline[
-                                    IDX(last, iCol - 1, tableID->nCols)];
+                                    IDX(last, (size_t)(iCol - 1), tableID->nCols)];
                                 t -= TABLE_COL0(last);
                                 y = TABLE(last, col); /* c[3] = y0 */
                                 y += ((c[0]*t + c[1])*t + c[2])*t;
@@ -979,7 +982,7 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                                 case STEFFEN_MONOTONE_C1:
                                     if (NULL != tableID->spline) {
                                         const double* c = tableID->spline[
-                                            IDX(last, iCol - 1, tableID->nCols)];
+                                            IDX(last, (size_t)(iCol - 1), tableID->nCols)];
                                         if (extrapolate == LEFT) {
                                             y = LINEAR_SLOPE(y0, c[2], t - t0);
                                         }
@@ -1198,7 +1201,7 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
                         case STEFFEN_MONOTONE_C1:
                             if (NULL != tableID->spline) {
                                 const double* c = tableID->spline[
-                                    IDX(last, iCol - 1, tableID->nCols)];
+                                    IDX(last, (size_t)(iCol - 1), tableID->nCols)];
                                 t -= TABLE_COL0(last);
                                 der_y = (3*c[0]*t + 2*c[1])*t + c[2];
                                 der_y *= der_t;
@@ -1232,7 +1235,7 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
                                 case STEFFEN_MONOTONE_C1:
                                     if (NULL != tableID->spline) {
                                         const double* c = tableID->spline[
-                                            IDX(last, iCol - 1, tableID->nCols)];
+                                            IDX(last, (size_t)(iCol - 1), tableID->nCols)];
                                         if (extrapolate == LEFT) {
                                             der_y = c[2];
                                         }
@@ -1696,9 +1699,11 @@ void* ModelicaStandardTables_CombiTable1D_init2(_In_z_ const char* fileName,
                 }
                 else {
                     /* Need to transpose */
-                    double* tableT = (double*)malloc(dim[0]*dim[1]*sizeof(double));
+                    double* tableT = (double*)malloc(
+                        (size_t)dim[0]*(size_t)dim[1]*sizeof(double));
                     if (NULL != tableT) {
-                        memcpy(tableT, tableID->table, dim[0]*dim[1]*sizeof(double));
+                        memcpy(tableT, tableID->table,
+                            (size_t)dim[0]*(size_t)dim[1]*sizeof(double));
                         tableID->table = tableT;
                         tableID->nRow = (size_t)dim[1];
                         tableID->nCol = (size_t)dim[0];
@@ -1895,7 +1900,7 @@ double ModelicaStandardTables_CombiTable1D_getValue(void* _tableID, int iCol,
                     case STEFFEN_MONOTONE_C1:
                         if (NULL != tableID->spline) {
                             const double* c = tableID->spline[
-                                IDX(last, iCol - 1, tableID->nCols)];
+                                IDX(last, (size_t)(iCol - 1), tableID->nCols)];
                             const double u0 = TABLE_COL0(last);
                             const double v = u - u0;
                             y = TABLE(last, col); /* c[3] = y0 */
@@ -1929,7 +1934,7 @@ double ModelicaStandardTables_CombiTable1D_getValue(void* _tableID, int iCol,
                                 if (NULL != tableID->spline) {
                                     const double u0 = TABLE_COL0(last);
                                     const double* c = tableID->spline[
-                                        IDX(last, iCol - 1, tableID->nCols)];
+                                        IDX(last, (size_t)(iCol - 1), tableID->nCols)];
                                     if (extrapolate == LEFT) {
                                         y = LINEAR_SLOPE(TABLE(last, col), c[2],
                                             u - u0);
@@ -2035,7 +2040,7 @@ double ModelicaStandardTables_CombiTable1D_getDerValue(void* _tableID, int iCol,
                     case STEFFEN_MONOTONE_C1:
                         if (NULL != tableID->spline) {
                             const double* c = tableID->spline[
-                                IDX(last, iCol - 1, tableID->nCols)];
+                                IDX(last, (size_t)(iCol - 1), tableID->nCols)];
                             const double v = u - TABLE_COL0(last);
                             der_y = (3*c[0]*v + 2*c[1])*v + c[2];
                             der_y *= der_u;
@@ -2066,7 +2071,7 @@ double ModelicaStandardTables_CombiTable1D_getDerValue(void* _tableID, int iCol,
                             case STEFFEN_MONOTONE_C1:
                                 if (NULL != tableID->spline) {
                                     const double* c = tableID->spline[
-                                        IDX(last, iCol - 1, tableID->nCols)];
+                                        IDX(last, (size_t)(iCol - 1), tableID->nCols)];
                                     if (extrapolate == LEFT) {
                                         der_y = c[2];
                                     }
@@ -2138,13 +2143,14 @@ void* ModelicaStandardTables_CombiTable2D_init(_In_z_ const char* tableName,
                                                _In_ double* table, size_t nRow,
                                                size_t nColumn, int smoothness) {
     return ModelicaStandardTables_CombiTable2D_init2(fileName, tableName,
-        table, nRow, nColumn, smoothness, 1 /* verbose */);
+        table, nRow, nColumn, smoothness, LAST_TWO_POINTS, 1 /* verbose */);
 }
 
 void* ModelicaStandardTables_CombiTable2D_init2(_In_z_ const char* fileName,
                                                 _In_z_ const char* tableName,
                                                 _In_ double* table, size_t nRow,
                                                 size_t nColumn, int smoothness,
+                                                int extrapolation,
                                                 int verbose) {
     CombiTable2D* tableID;
 #if defined(TABLE_SHARE)
@@ -2204,6 +2210,7 @@ void* ModelicaStandardTables_CombiTable2D_init2(_In_z_ const char* fileName,
     }
 
     tableID->smoothness = (enum Smoothness)smoothness;
+    tableID->extrapolation = (enum Extrapolation)extrapolation;
     tableID->source = source;
 
     switch (tableID->source) {
@@ -2245,9 +2252,11 @@ void* ModelicaStandardTables_CombiTable2D_init2(_In_z_ const char* fileName,
                 }
                 else {
                     /* Need to transpose */
-                    double* tableT = (double*)malloc(dim[0]*dim[1]*sizeof(double));
+                    double* tableT = (double*)malloc(
+                        (size_t)dim[0]*(size_t)dim[1]*sizeof(double));
                     if (NULL != tableT) {
-                        memcpy(tableT, tableID->table, dim[0]*dim[1]*sizeof(double));
+                        memcpy(tableT, tableID->table,
+                            (size_t)dim[0]*(size_t)dim[1]*sizeof(double));
                         tableID->table = tableT;
                         tableID->nRow = (size_t)dim[1];
                         tableID->nCol = (size_t)dim[0];
@@ -3405,8 +3414,8 @@ static CubicHermite1D* akimaSpline1DInit(_In_ const double* table, size_t nRow,
 
         /* Calculation of the divided differences */
         for (i = 0; i < nRow - 1; i++) {
-            d[i + 2] =
-                (TABLE(i + 1, cols[col] - 1) - TABLE(i, cols[col] - 1))/
+            size_t c = (size_t)(cols[col] - 1);
+            d[i + 2] = (TABLE(i + 1, c) - TABLE(i, c))/
                 (TABLE_COL0(i + 1) - TABLE_COL0(i));
         }
 
@@ -3485,8 +3494,8 @@ static CubicHermite1D* fritschButlandSpline1DInit(_In_ const double* table,
 
         /* Calculation of the divided differences */
         for (i = 0; i < nRow - 1; i++) {
-            d[i] =
-                (TABLE(i + 1, cols[col] - 1) - TABLE(i, cols[col] - 1))/
+            size_t c = (size_t)(cols[col] - 1);
+            d[i] = (TABLE(i + 1, c) - TABLE(i, c))/
                 (TABLE_COL0(i + 1) - TABLE_COL0(i));
         }
 
@@ -3554,8 +3563,8 @@ static CubicHermite1D* steffenSpline1DInit(_In_ const double* table,
 
         /* Calculation of the divided differences */
         for (i = 0; i < nRow - 1; i++) {
-            d[i] =
-                (TABLE(i + 1, cols[col] - 1) - TABLE(i, cols[col] - 1))/
+            size_t c = (size_t)(cols[col] - 1);
+            d[i] = (TABLE(i + 1, c) - TABLE(i, c))/
                 (TABLE_COL0(i + 1) - TABLE_COL0(i));
         }
 
