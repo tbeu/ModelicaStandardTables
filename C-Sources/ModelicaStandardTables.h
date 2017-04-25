@@ -39,6 +39,10 @@
    DUMMY_FUNCTION_USERTAB: Use a dummy function "usertab"
 
    Release Notes:
+      Apr. 24, 2017: by Thomas Beutlich, ESI ITI GmbH
+                     Added functions to retrieve minimum and maximum abscissa
+                     values of CombiTable2D (ticket #2244)
+
       Apr. 15, 2017: by Thomas Beutlich, ESI ITI GmbH
                      Added support for time event generation (independent of
                      smoothness) in CombiTimeTable (ticket #2080)
@@ -54,10 +58,9 @@
                      in CombiTimeTable (ticket #1771)
 
       Feb. 25, 2017: by Thomas Beutlich, ESI ITI GmbH
-                     Added support for extrapolation in CombiTable1D
-                     Added functions to retrieve minimum and maximum
-                     abscissa values of CombiTable1D
-                     (ticket #2120)
+                     Added support for extrapolation in CombiTable1D (ticket #1839)
+                     Added functions to retrieve minimum and maximum abscissa
+                     values of CombiTable1D (ticket #2120)
 
       Oct. 27, 2015: by Thomas Beutlich, ITI GmbH
                      Added nonnull attribute/annotations (ticket #1436)
@@ -347,6 +350,14 @@ MODELICA_EXPORT void* ModelicaStandardTables_CombiTable2D_init2(_In_z_ const cha
 
 MODELICA_EXPORT void ModelicaStandardTables_CombiTable2D_close(void* tableID);
   /* Close table and free allocated memory */
+
+MODELICA_EXPORT void ModelicaStandardTables_CombiTable2D_minimumAbscissa(void* tableID,
+                                                         _Inout_ double* uMin);
+  /* Get minimum abscissa defined in table (= table[2,1] and table[1,2]) */
+
+MODELICA_EXPORT void ModelicaStandardTables_CombiTable2D_maximumAbscissa(void* tableID,
+                                                         _Inout_ double* uMax);
+  /* Get maximum abscissa defined in table (= table[end,1] and table[1,end]) */
 
 MODELICA_EXPORT double ModelicaStandardTables_CombiTable2D_getValue(void* tableID, double u1,
                                                     double u2);

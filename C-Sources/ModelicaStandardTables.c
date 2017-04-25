@@ -34,6 +34,10 @@
       Modelica.Blocks.Tables.CombiTable2D
 
    Release Notes:
+      Apr. 24, 2017: by Thomas Beutlich, ESI ITI GmbH
+                     Added functions to retrieve minimum and maximum abscissa
+                     values of CombiTable2D (ticket #2244)
+
       Apr. 15, 2017: by Thomas Beutlich, ESI ITI GmbH
                      Added support for time event generation (independent of
                      smoothness) in CombiTimeTable (ticket #2080)
@@ -60,7 +64,7 @@
                      in function readTable (ticket #2097)
 
       Feb. 25, 2017: by Thomas Beutlich, ESI ITI GmbH
-                     Added support of extrapolation for CombiTable1D (ticket #1839)
+                     Added support for extrapolation in CombiTable1D (ticket #1839)
                      Added functions to retrieve minimum and maximum abscissa
                      values of CombiTable1D (ticket #2120)
 
@@ -1009,7 +1013,14 @@ double ModelicaStandardTables_CombiTimeTable_getValue(void* _tableID, int iCol,
                             break;
 
                         case NO_EXTRAPOLATION:
-                            ModelicaError("Extrapolation error\n");
+                            ModelicaFormatError("Extrapolation error: Time "
+                                "(=%lf) must be %s or equal\nthan the %s abscissa "
+                                "value %s (=%lf) defined in the table.\n", tOld,
+                                (extrapolate == LEFT) ? "greater" : "less",
+                                (extrapolate == LEFT) ? "minimum" : "maximum",
+                                (extrapolate == LEFT) ? "t_min" : "t_max",
+                                (extrapolate == LEFT) ?
+                                TABLE_ROW0(0) : TABLE_COL0(tableID->nRow - 1));
                             return y;
 
                         case PERIODIC:
@@ -1259,7 +1270,14 @@ double ModelicaStandardTables_CombiTimeTable_getDerValue(void* _tableID, int iCo
                             break;
 
                         case NO_EXTRAPOLATION:
-                            ModelicaError("Extrapolation error\n");
+                            ModelicaFormatError("Extrapolation error: Time "
+                                "(=%lf) must be %s or equal\nthan the %s abscissa "
+                                "value %s (=%lf) defined in the table.\n", tOld,
+                                (extrapolate == LEFT) ? "greater" : "less",
+                                (extrapolate == LEFT) ? "minimum" : "maximum",
+                                (extrapolate == LEFT) ? "t_min" : "t_max",
+                                (extrapolate == LEFT) ?
+                                TABLE_ROW0(0) : TABLE_COL0(tableID->nRow - 1));
                             return der_y;
 
                         case PERIODIC:
@@ -1469,9 +1487,9 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
                             int isEq = isNearlyEqual(t0, t1);
                             if ((tableID->timeEvents == ALWAYS && !isEq) ||
                                 (tableID->timeEvents == AT_DISCONT && isEq)) {
-	                            nextTimeEvent = t0;
-	                            break;
-	                        }
+                                nextTimeEvent = t0;
+                                break;
+                            }
                         }
                     }
 
@@ -1961,7 +1979,14 @@ double ModelicaStandardTables_CombiTable1D_getValue(void* _tableID, int iCol,
                         break;
 
                     case NO_EXTRAPOLATION:
-                        ModelicaError("Extrapolation error\n");
+                        ModelicaFormatError("Extrapolation error: The value u "
+                            "(=%lf) must be %s or equal\nthan the %s abscissa "
+                            "value %s (=%lf) defined in the table.\n", u,
+                            (extrapolate == LEFT) ? "greater" : "less",
+                            (extrapolate == LEFT) ? "minimum" : "maximum",
+                            (extrapolate == LEFT) ? "u_min" : "u_max",
+                            (extrapolate == LEFT) ?
+                            TABLE_ROW0(0) : TABLE_COL0(tableID->nRow - 1));
                         return y;
 
                     case PERIODIC:
@@ -2095,7 +2120,14 @@ double ModelicaStandardTables_CombiTable1D_getDerValue(void* _tableID, int iCol,
                         break;
 
                     case NO_EXTRAPOLATION:
-                        ModelicaError("Extrapolation error\n");
+                        ModelicaFormatError("Extrapolation error: The value u "
+                            "(=%lf) must be %s or equal\nthan the %s abscissa "
+                            "value %s (=%lf) defined in the table.\n", u,
+                            (extrapolate == LEFT) ? "greater" : "less",
+                            (extrapolate == LEFT) ? "minimum" : "maximum",
+                            (extrapolate == LEFT) ? "u_min" : "u_max",
+                            (extrapolate == LEFT) ?
+                            TABLE_ROW0(0) : TABLE_COL0(tableID->nRow - 1));
                         return der_y;
 
                     case PERIODIC:
@@ -3036,6 +3068,37 @@ double ModelicaStandardTables_CombiTable2D_getDerValue(void* _tableID, double u1
         }
     }
     return der_y;
+}
+
+void ModelicaStandardTables_CombiTable2D_minimumAbscissa(void* _tableID,
+                                                         _Inout_ double* uMin) {
+    CombiTable2D* tableID = (CombiTable2D*)_tableID;
+    if (NULL != tableID && NULL != tableID->table) {
+        const double* table = tableID->table;
+        const size_t nCol = tableID->nCol;
+        uMin[0] = TABLE_COL0(1);
+        uMin[1] = TABLE_ROW0(1);
+    }
+    else {
+        uMin[0] = 0.;
+        uMin[1] = 0.;
+    }
+}
+
+void ModelicaStandardTables_CombiTable2D_maximumAbscissa(void* _tableID,
+                                                         _Inout_ double* uMax) {
+    CombiTable2D* tableID = (CombiTable2D*)_tableID;
+    if (NULL != tableID && NULL != tableID->table) {
+        const double* table = tableID->table;
+        const size_t nRow = tableID->nRow;
+        const size_t nCol = tableID->nCol;
+        uMax[0] = TABLE_COL0(nRow - 1);
+        uMax[1] = TABLE_ROW0(nCol - 1);
+    }
+    else {
+        uMax[0] = 0.;
+        uMax[1] = 0.;
+    }
 }
 
 double ModelicaStandardTables_CombiTable2D_read(void* _tableID, int force,
