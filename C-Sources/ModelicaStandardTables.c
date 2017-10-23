@@ -1437,7 +1437,7 @@ double ModelicaStandardTables_CombiTimeTable_nextTimeEvent(void* _tableID,
                             tableID->intervals[eventInterval][1] = i + 1;
                         }
                     }
-                    else if (tableID->timeEvents == AT_DISCONT) {
+                    else /* if (tableID->timeEvents == AT_DISCONT) */ {
                         if (t1 > tEvent) {
                             if (isNearlyEqual(t0, t1)) {
                                 tEvent = t1;
@@ -4610,7 +4610,7 @@ static int isValidCombiTimeTable(CombiTimeTable* tableID,
         const size_t nRow = tableID->nRow;
         const size_t nCol = tableID->nCol;
         const char* tableDummyName = "NoName";
-        const char* tableName = (0 < strlen(_tableName)) ? _tableName : tableDummyName;
+        const char* tableName = _tableName[0] != '\0' ? _tableName : tableDummyName;
         size_t iCol;
 
         /* Check dimensions */
@@ -4717,7 +4717,7 @@ static int isValidCombiTable1D(CombiTable1D* tableID,
         const size_t nRow = tableID->nRow;
         const size_t nCol = tableID->nCol;
         const char* tableDummyName = "NoName";
-        const char* tableName = (0 < strlen(_tableName)) ? _tableName : tableDummyName;
+        const char* tableName = _tableName[0] != '\0' ? _tableName : tableDummyName;
         size_t iCol;
 
         /* Check dimensions */
@@ -4780,7 +4780,7 @@ static int isValidCombiTable2D(CombiTable2D* tableID,
         const size_t nRow = tableID->nRow;
         const size_t nCol = tableID->nCol;
         const char* tableDummyName = "NoName";
-        const char* tableName = (0 < strlen(_tableName)) ? _tableName : tableDummyName;
+        const char* tableName = _tableName[0] != '\0' ? _tableName : tableDummyName;
 
         /* Check dimensions */
         if (nRow < 2 || nCol < 2) {
