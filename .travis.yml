@@ -13,6 +13,7 @@ addons:
       - ubuntu-toolchain-r-test
     packages:
       - gcc-4.4-multilib
+      - gcc-4.6-multilib
       - gcc-4.8-multilib
       - linux-libc-dev
       - linux-libc-dev:i386
@@ -25,15 +26,15 @@ addons:
     branch_pattern: coverity_scan
 
 compiler:
-  - gcc
   - gcc-4.4
+  - gcc-4.6
   - gcc-4.8
   - clang
 
 matrix:
   exclude:
     - os: osx
-      compiler: gcc-4.8
+      compiler: gcc-4.6
     - os: osx
       compiler: gcc-4.4
 
