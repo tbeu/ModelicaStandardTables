@@ -26,6 +26,7 @@ addons:
     branch_pattern: coverity_scan
 
 compiler:
+  - gcc
   - gcc-4.4
   - gcc-4.6
   - gcc-4.8
@@ -34,9 +35,13 @@ compiler:
 matrix:
   exclude:
     - os: osx
+      compiler: gcc-4.4
+    - os: osx
       compiler: gcc-4.6
     - os: osx
-      compiler: gcc-4.4
+      compiler: gcc-4.8
+    - os: linux
+      compiler: gcc
 
 env:
   global:
