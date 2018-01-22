@@ -1,7 +1,7 @@
 AR = ar -ru
 RM = rm -f
 
-CFLAGS = -O3
+CFLAGS = -O3 -Wno-attributes
 CPPFLAGS = -DNDEBUG
 INC = -I"../../C-Sources/zlib"
 
