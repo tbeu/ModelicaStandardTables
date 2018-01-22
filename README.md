@@ -8,7 +8,7 @@ The library was presented at the [10th International Modelica Conference](https:
 [![Build Status](https://travis-ci.org/tbeu/ModelicaStandardTables.svg?branch=master)](https://travis-ci.org/tbeu/ModelicaStandardTables) [![Coverity Scan Build Status](https://scan.coverity.com/projects/7679/badge.svg)](https://scan.coverity.com/projects/tbeu-modelicastandardtables)
 
 ## License
-ModelicaStandardTables is released under the terms of the Simplified BSD License.
+ModelicaStandardTables is released under the terms of the Revised BSD License.
 
 ## Acknowledgement
 ModelicaStandardTables is based on the following third-party C projects
