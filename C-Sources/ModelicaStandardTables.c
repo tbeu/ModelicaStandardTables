@@ -131,7 +131,7 @@
       May 21, 2014:  by Thomas Beutlich, ITI GmbH
                      Fixed bivariate Akima-spline extrapolation (ticket #1465)
                      Improved error message in case of trailing numbers when parsing
-                     a line of an external ASCII text file (ticket #1494)
+                     a line of a text file (ticket #1494)
 
       Oct. 17, 2013: by Thomas Beutlich, ITI GmbH
                      Added support of 2D tables that actually degrade to 1D tables
@@ -484,7 +484,7 @@ static size_t key_strlen(_In_z_ const char *s);
 static READ_RESULT readTable(_In_z_ const char* fileName, _In_z_ const char* tableName,
                              _Inout_ size_t* nRow, _Inout_ size_t* nCol, int verbose,
                              int force) MODELICA_NONNULLATTR;
-  /* Read a table from an ASCII text or MATLAB MAT-file
+  /* Read a table from a text or MATLAB MAT-file
 
      <- RETURN: Pointer to TableShare structure or
         pointer to array (row-wise storage) of table values
@@ -594,7 +594,7 @@ void* ModelicaStandardTables_CombiTimeTable_init2(_In_z_ const char* fileName,
         if (NULL != file) {
             MUTEX_LOCK();
             if (--file->refCount == 0) {
-                free(file->table);
+                ModelicaIO_freeRealTable(file->table);
                 free(file->key);
                 HASH_DEL(tableShare, file);
                 free(file);
@@ -773,7 +773,7 @@ void ModelicaStandardTables_CombiTimeTable_close(void* _tableID) {
             if (NULL != file) {
                 /* Share hit */
                 if (--file->refCount == 0) {
-                    free(file->table);
+                    ModelicaIO_freeRealTable(file->table);
                     free(file->key);
                     HASH_DEL(tableShare, file);
                     free(file);
@@ -1766,7 +1766,7 @@ void* ModelicaStandardTables_CombiTable1D_init2(_In_z_ const char* fileName,
         if (NULL != file) {
             MUTEX_LOCK();
             if (--file->refCount == 0) {
-                free(file->table);
+                ModelicaIO_freeRealTable(file->table);
                 free(file->key);
                 HASH_DEL(tableShare, file);
                 free(file);
@@ -1940,7 +1940,7 @@ void ModelicaStandardTables_CombiTable1D_close(void* _tableID) {
             if (NULL != file) {
                 /* Share hit */
                 if (--file->refCount == 0) {
-                    free(file->table);
+                    ModelicaIO_freeRealTable(file->table);
                     free(file->key);
                     HASH_DEL(tableShare, file);
                     free(file);
@@ -2405,7 +2405,7 @@ void* ModelicaStandardTables_CombiTable2D_init2(_In_z_ const char* fileName,
         if (NULL != file) {
             MUTEX_LOCK();
             if (--file->refCount == 0) {
-                free(file->table);
+                ModelicaIO_freeRealTable(file->table);
                 free(file->key);
                 HASH_DEL(tableShare, file);
                 free(file);
@@ -2548,7 +2548,7 @@ void ModelicaStandardTables_CombiTable2D_close(void* _tableID) {
             if (NULL != file) {
                 /* Share hit */
                 if (--file->refCount == 0) {
-                    free(file->table);
+                    ModelicaIO_freeRealTable(file->table);
                     free(file->key);
                     HASH_DEL(tableShare, file);
                     free(file);
@@ -5632,7 +5632,7 @@ static READ_RESULT readTable(_In_z_ const char* fileName, _In_z_ const char* tab
                 /* Again allocate and set key */
                 key = (char*)malloc((lenFileName + strlen(tableName) + 2) * sizeof(char));
                 if (NULL == key) {
-                    free(table);
+                    ModelicaIO_freeRealTable(table);
                     return file;
                 }
                 strcpy(key, fileName);
@@ -5655,14 +5655,14 @@ static READ_RESULT readTable(_In_z_ const char* fileName, _In_z_ const char* tab
                     if (NULL == file->hh.tbl) {
                         free(key);
                         free(file);
-                        free(table);
+                        ModelicaIO_freeRealTable(table);
                         MUTEX_UNLOCK();
                         return NULL;
                     }
                 }
                 else {
                     free(key);
-                    free(table);
+                    ModelicaIO_freeRealTable(table);
                     MUTEX_UNLOCK();
                     return file;
                 }
@@ -5673,7 +5673,7 @@ static READ_RESULT readTable(_In_z_ const char* fileName, _In_z_ const char* tab
                 */
                 free(key);
                 if (file->refCount == 1) {
-                    free(file->table);
+                    ModelicaIO_freeRealTable(file->table);
                     file->nRow = *nRow;
                     file->nCol = *nCol;
                     file->table = table;
@@ -5688,7 +5688,7 @@ static READ_RESULT readTable(_In_z_ const char* fileName, _In_z_ const char* tab
                 */
                 free(key);
                 if (NULL != table) {
-                    free(table);
+                    ModelicaIO_freeRealTable(table);
                 }
                 file->refCount++;
                 *nRow = file->nRow;
