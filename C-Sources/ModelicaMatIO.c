@@ -5382,8 +5382,6 @@ static int       Mat_VarWriteAppend73(mat_t *mat,matvar_t *matvar,int compress,
 #endif
 #if defined(_MSC_VER) || defined(__MINGW32__)
 #   define SIZE_T_FMTSTR "Iu"
-#elif defined(__GNUC__) && __STDC_VERSION__ < 199901L
-#   define SIZE_T_FMTSTR "lu"
 #else
 #   define SIZE_T_FMTSTR "zu"
 #endif
