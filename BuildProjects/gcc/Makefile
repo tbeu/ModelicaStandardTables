@@ -7,7 +7,8 @@ INC = -I"../../C-Sources/zlib"
 TARGETDIR = linux64
 
 TABLES_OBJS = \
-	ModelicaStandardTables.o
+	ModelicaStandardTables.o \
+	ModelicaStandardTablesUsertab.o
 
 MATIO_OBJS = \
 	ModelicaMatIO.o
@@ -52,7 +53,7 @@ libzlib.a: $(ZLIB_OBJS)
 	$(AR) $@ $(ZLIB_OBJS)
 	cp $@ ../../Library/$(TARGETDIR)/$@
 
-ModelicaStandardTables.o: ../../C-Sources/ModelicaStandardTables.c
+ModelicaStandardTables.o: ../../C-Sources/ModelicaStandardTables.c ../../C-Sources/ModelicaStandardTablesUsertab.c
 	$(CC) $(CPPFLAGS) -DDUMMY_FUNCTION_USERTAB $(CFLAGS) $(INC) -c -o $@ $<
 
 ModelicaMatIO.o: ../../C-Sources/ModelicaMatIO.c
