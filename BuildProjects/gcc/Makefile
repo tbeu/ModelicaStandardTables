@@ -53,7 +53,10 @@ libzlib.a: $(ZLIB_OBJS)
 	$(AR) $@ $(ZLIB_OBJS)
 	cp $@ ../../Library/$(TARGETDIR)/$@
 
-ModelicaStandardTables.o: ../../C-Sources/ModelicaStandardTables.c ../../C-Sources/ModelicaStandardTablesUsertab.c
+ModelicaStandardTables.o: ../../C-Sources/ModelicaStandardTables.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(INC) -c -o $@ $<
+
+ModelicaStandardTablesUsertab.o: ../../C-Sources/ModelicaStandardTablesUsertab.c
 	$(CC) $(CPPFLAGS) -DDUMMY_FUNCTION_USERTAB $(CFLAGS) $(INC) -c -o $@ $<
 
 ModelicaMatIO.o: ../../C-Sources/ModelicaMatIO.c
