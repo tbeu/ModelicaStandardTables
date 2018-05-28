@@ -29,7 +29,7 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-/* The usertab function needs to be in a separate object or gcc/clang
+/* The usertab function needs to be in a separate object or clang/gcc
    optimize the code in such a way that the user-defined usertab gets
    sent the wrong input.
 
