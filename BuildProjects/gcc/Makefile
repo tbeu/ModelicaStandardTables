@@ -11,7 +11,8 @@ TABLES_OBJS = \
 	ModelicaStandardTablesUsertab.o
 
 MATIO_OBJS = \
-	ModelicaMatIO.o
+	ModelicaMatIO.o \
+	snprintf.o
 
 IO_OBJS = \
 	ModelicaIO.o
@@ -60,6 +61,9 @@ ModelicaStandardTablesUsertab.o: ../../C-Sources/ModelicaStandardTablesUsertab.c
 	$(CC) $(CPPFLAGS) -DDUMMY_FUNCTION_USERTAB $(CFLAGS) $(INC) -c -o $@ $<
 
 ModelicaMatIO.o: ../../C-Sources/ModelicaMatIO.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(INC) -c -o $@ $<
+
+snprintf.o: ../../C-Sources/snprintf.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(INC) -c -o $@ $<
 
 ModelicaIO.o: ../../C-Sources/ModelicaIO.c
