@@ -3906,6 +3906,13 @@ static int       Mat_VarWriteAppend73(mat_t *mat,matvar_t *matvar,int compress,
  *===================================================================
  */
 
+static char* mat_strdup(const char *s)
+{
+    size_t len = strlen(s) + 1;
+    char *d = (char*)malloc(len);
+    return d ? (char*)memcpy(d, s, len) : NULL;
+}
+
 static void
 ReadData(mat_t *mat, matvar_t *matvar)
 {
