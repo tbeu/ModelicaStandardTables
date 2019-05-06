@@ -50,6 +50,10 @@ matrix:
     - os: linux
       compiler: gcc
       env:
+        - CPPFLAGS="-DTABLE_SHARE -DNO_FILE_SYSTEM -DNDEBUG -DHAVE_UNISTD_H=1 -DHAVE_STDARG_H=1 -DHAVE_HIDDEN=1 -DHAVE_MEMCPY=1"
+    - os: linux
+      compiler: gcc
+      env:
         - CPPFLAGS="-DNO_MUTEX -DNDEBUG -DHAVE_UNISTD_H=1 -DHAVE_STDARG_H=1 -DHAVE_HIDDEN=1 -DHAVE_MEMCPY=1"
     - os: linux
       compiler: gcc
