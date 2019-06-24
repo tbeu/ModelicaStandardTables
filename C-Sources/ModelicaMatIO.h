@@ -54,13 +54,13 @@
 #define MATIO_MINOR_VERSION 5
 
 /* Matio release level number */
-#define MATIO_RELEASE_LEVEL 15
+#define MATIO_RELEASE_LEVEL 16
 
 /* Matio version number */
-#define MATIO_VERSION 1515
+#define MATIO_VERSION 1516
 
 /* Matio version string */
-#define MATIO_VERSION_STR "1.5.15"
+#define MATIO_VERSION_STR "1.5.16"
 
 /* Default file format */
 #define MAT_FT_DEFAULT MAT_FT_MAT5
@@ -355,9 +355,9 @@ MATIO_EXTERN size_t Mat_SizeOf(enum matio_types data_type);
 MATIO_EXTERN size_t Mat_SizeOfClass(int class_type);
 
 /* MAT File functions */
-#define            Mat_Create(a,b) Mat_CreateVer(a,b,MAT_FT_DEFAULT)
+#define                  Mat_Create(a,b) Mat_CreateVer(a,b,MAT_FT_DEFAULT)
 MATIO_EXTERN mat_t      *Mat_CreateVer(const char *matname,const char *hdr_str,
-                       enum mat_ft mat_file_ver);
+                             enum mat_ft mat_file_ver);
 MATIO_EXTERN int         Mat_Close(mat_t *mat);
 MATIO_EXTERN mat_t      *Mat_Open(const char *matname,int mode);
 MATIO_EXTERN const char *Mat_GetFilename(mat_t *mat);
