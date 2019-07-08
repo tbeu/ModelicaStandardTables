@@ -1,7 +1,7 @@
 AR = ar -ru
 RM = rm -f
 
-CFLAGS = -O3 -Wno-attributes
+CFLAGS = -O3 -Wno-attributes -fno-delete-null-pointer-checks
 INC = -I"../../C-Sources/zlib"
 
 TARGETDIR = linux64
