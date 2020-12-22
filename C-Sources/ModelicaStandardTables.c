@@ -39,6 +39,9 @@
       Modelica.Blocks.Tables.CombiTable2Dv
 
    Changelog:
+      Dec. 22, 2020: by Thomas Beutlich
+                     Added reading of CSV files (ticket #1153)
+
       May 27, 2020:  by Thomas Beutlich
                      Fixed invalid memory access in error messages of
                      isValidCombiTimeTable and isValidCombiTable1D (ticket #3562)
@@ -165,32 +168,6 @@
 #include "ModelicaIO.h"
 #include "ModelicaUtilities.h"
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
-/* Have the <stdint.h> header file */
-#if defined(_WIN32)
-#if defined(_MSC_VER) && _MSC_VER >= 1600
-#define HAVE_STDINT_H 1
-#elif defined(__WATCOMC__) || defined(__MINGW32__) || defined(__CYGWIN__)
-#define HAVE_STDINT_H 1
-#else
-#undef HAVE_STDINT_H
-#endif
-#elif defined(__GNUC__) && !defined(__VXWORKS__)
-#define HAVE_STDINT_H 1
-#else
-#undef HAVE_STDINT_H
-#endif
-
-/* Replacement for integer type header */
-#if !defined(HAVE_STDINT_H)
-#define HASH_NO_STDINT 1
-#if defined(_MSC_VER)
-#include "stdint_msvc.h"
-#else
-#define uint32_t unsigned int
-#define uint8_t unsigned char
-#endif
-#endif
-
 #define uthash_strlen(s) key_strlen(s)
 #define HASH_NONFATAL_OOM 1
 #include "uthash.h"
@@ -549,7 +526,8 @@ static size_t key_strlen(_In_z_ const char *s);
 #endif
 static READ_RESULT readTable(_In_z_ const char* fileName, _In_z_ const char* tableName,
                              _Inout_ size_t* nRow, _Inout_ size_t* nCol, int verbose,
-                             int force) MODELICA_NONNULLATTR;
+                             int force, _In_z_ const char* delimiter,
+                             int nHeaderLines) MODELICA_NONNULLATTR;
   /* Read a table from a text or MATLAB MAT-file
 
      <- RETURN: Pointer to TableShare structure or
@@ -639,6 +617,24 @@ void* ModelicaStandardTables_CombiTimeTable_init2(_In_z_ const char* fileName,
                                                   double shiftTime,
                                                   int timeEvents,
                                                   int verbose) {
+    return ModelicaStandardTables_CombiTimeTable_init3(fileName,
+        tableName, table, nRow, nColumn, startTime, columns, nCols, smoothness,
+        extrapolation, shiftTime, timeEvents, verbose, ",", 0);
+}
+
+void* ModelicaStandardTables_CombiTimeTable_init3(_In_z_ const char* fileName,
+                                                  _In_z_ const char* tableName,
+                                                  _In_ double* table, size_t nRow,
+                                                  size_t nColumn,
+                                                  double startTime,
+                                                  _In_ int* columns,
+                                                  size_t nCols, int smoothness,
+                                                  int extrapolation,
+                                                  double shiftTime,
+                                                  int timeEvents,
+                                                  int verbose,
+                                                  _In_z_ const char* delimiter,
+                                                  int nHeaderLines) {
     CombiTimeTable* tableID;
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
     TableShare* file = NULL;
@@ -652,7 +648,7 @@ void* ModelicaStandardTables_CombiTimeTable_init2(_In_z_ const char* fileName,
     /* Read table from file before any other heap allocation */
     if (TABLESOURCE_FILE == source) {
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
-        file = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0);
+        file = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0, delimiter, nHeaderLines);
         if (NULL != file) {
             keyFile = file->key;
             tableFile = file->table;
@@ -661,7 +657,7 @@ void* ModelicaStandardTables_CombiTimeTable_init2(_In_z_ const char* fileName,
             return NULL;
         }
 #else
-        tableFile = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0);
+        tableFile = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0, delimiter, nHeaderLines);
         if (NULL == tableFile) {
             return NULL;
         }
@@ -1995,7 +1991,7 @@ double ModelicaStandardTables_CombiTimeTable_read(void* _tableID, int force,
             const char* tableName = tableID->key + strlen(fileName) + 1;
 #if defined(TABLE_SHARE)
             TableShare* file = readTable(fileName, tableName, &tableID->nRow,
-                &tableID->nCol, verbose, force);
+                &tableID->nCol, verbose, force, ",", 0);
             if (NULL != file) {
                 tableID->table = file->table;
             }
@@ -2007,7 +2003,7 @@ double ModelicaStandardTables_CombiTimeTable_read(void* _tableID, int force,
                 free(tableID->table);
             }
             tableID->table = readTable(fileName, tableName, &tableID->nRow,
-                &tableID->nCol, verbose, force);
+                &tableID->nCol, verbose, force, ",", 0);
 #endif
             if (NULL == tableID->table) {
                 return 0.; /* Error */
@@ -2082,6 +2078,21 @@ void* ModelicaStandardTables_CombiTable1D_init2(_In_z_ const char* fileName,
                                                 size_t nCols, int smoothness,
                                                 int extrapolation,
                                                 int verbose) {
+    return ModelicaStandardTables_CombiTable1D_init3(fileName, tableName,
+        table, nRow, nColumn, columns, nCols, smoothness, LAST_TWO_POINTS,
+        1 /* verbose */, ",", 0);
+}
+
+void* ModelicaStandardTables_CombiTable1D_init3(_In_z_ const char* fileName,
+                                                _In_z_ const char* tableName,
+                                                _In_ double* table, size_t nRow,
+                                                size_t nColumn,
+                                                _In_ int* columns,
+                                                size_t nCols, int smoothness,
+                                                int extrapolation,
+                                                int verbose,
+                                                _In_z_ const char* delimiter,
+                                                int nHeaderLines) {
     CombiTable1D* tableID;
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
     TableShare* file = NULL;
@@ -2095,7 +2106,7 @@ void* ModelicaStandardTables_CombiTable1D_init2(_In_z_ const char* fileName,
     /* Read table from file before any other heap allocation */
     if (TABLESOURCE_FILE == source) {
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
-        file = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0);
+        file = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0, delimiter, nHeaderLines);
         if (NULL != file) {
             keyFile = file->key;
             tableFile = file->table;
@@ -2104,7 +2115,7 @@ void* ModelicaStandardTables_CombiTable1D_init2(_In_z_ const char* fileName,
             return NULL;
         }
 #else
-        tableFile = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0);
+        tableFile = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0, delimiter, nHeaderLines);
         if (NULL == tableFile) {
             return NULL;
         }
@@ -2792,7 +2803,7 @@ double ModelicaStandardTables_CombiTable1D_read(void* _tableID, int force,
             const char* tableName = tableID->key + strlen(fileName) + 1;
 #if defined(TABLE_SHARE)
             TableShare* file = readTable(fileName, tableName, &tableID->nRow,
-                &tableID->nCol, verbose, force);
+                &tableID->nCol, verbose, force, ",", 0);
             if (NULL != file) {
                 tableID->table = file->table;
             }
@@ -2804,7 +2815,7 @@ double ModelicaStandardTables_CombiTable1D_read(void* _tableID, int force,
                 free(tableID->table);
             }
             tableID->table = readTable(fileName, tableName, &tableID->nRow,
-                &tableID->nCol, verbose, force);
+                &tableID->nCol, verbose, force, ",", 0);
 #endif
             if (NULL == tableID->table) {
                 return 0.; /* Error */
@@ -2874,6 +2885,18 @@ void* ModelicaStandardTables_CombiTable2D_init2(_In_z_ const char* fileName,
                                                 size_t nColumn, int smoothness,
                                                 int extrapolation,
                                                 int verbose) {
+    return ModelicaStandardTables_CombiTable2D_init3(fileName, tableName,
+        table, nRow, nColumn, smoothness, LAST_TWO_POINTS, 1 /* verbose */, ",", 0);
+}
+
+void* ModelicaStandardTables_CombiTable2D_init3(_In_z_ const char* fileName,
+                                                _In_z_ const char* tableName,
+                                                _In_ double* table, size_t nRow,
+                                                size_t nColumn, int smoothness,
+                                                int extrapolation,
+                                                int verbose,
+                                                _In_z_ const char* delimiter,
+                                                int nHeaderLines) {
     CombiTable2D* tableID;
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
     TableShare* file = NULL;
@@ -2887,7 +2910,7 @@ void* ModelicaStandardTables_CombiTable2D_init2(_In_z_ const char* fileName,
     /* Read table from file before any other heap allocation */
     if (TABLESOURCE_FILE == source) {
 #if defined(TABLE_SHARE) && !defined(NO_FILE_SYSTEM)
-        file = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0);
+        file = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0, delimiter, nHeaderLines);
         if (NULL != file) {
             keyFile = file->key;
             tableFile = file->table;
@@ -2896,7 +2919,7 @@ void* ModelicaStandardTables_CombiTable2D_init2(_In_z_ const char* fileName,
             return NULL;
         }
 #else
-        tableFile = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0);
+        tableFile = readTable(fileName, tableName, &nRowFile, &nColFile, verbose, 0, delimiter, nHeaderLines);
         if (NULL == tableFile) {
             return NULL;
         }
@@ -6050,7 +6073,7 @@ double ModelicaStandardTables_CombiTable2D_read(void* _tableID, int force,
             const char* tableName = tableID->key + strlen(fileName) + 1;
 #if defined(TABLE_SHARE)
             TableShare* file = readTable(fileName, tableName, &tableID->nRow,
-                &tableID->nCol, verbose, force);
+                &tableID->nCol, verbose, force, ",", 0);
             if (NULL != file) {
                 tableID->table = file->table;
             }
@@ -6062,7 +6085,7 @@ double ModelicaStandardTables_CombiTable2D_read(void* _tableID, int force,
                 free(tableID->table);
             }
             tableID->table = readTable(fileName, tableName, &tableID->nRow,
-                &tableID->nCol, verbose, force);
+                &tableID->nCol, verbose, force, ",", 0);
 #endif
             if (NULL == tableID->table) {
                 return 0.; /* Error */
@@ -7245,7 +7268,7 @@ static size_t key_strlen(_In_z_ const char *s) {
 
 static READ_RESULT readTable(_In_z_ const char* fileName, _In_z_ const char* tableName,
                              _Inout_ size_t* nRow, _Inout_ size_t* nCol, int verbose,
-                             int force) {
+                             int force, _In_z_ const char* delimiter, int nHeaderLines) {
 #if !defined(NO_FILE_SYSTEM)
 #if defined(TABLE_SHARE)
     TableShare* file = NULL;
@@ -7262,14 +7285,14 @@ static READ_RESULT readTable(_In_z_ const char* fileName, _In_z_ const char* tab
             MUTEX_LOCK();
             HASH_FIND_STR(tableShare, key, file);
             if (NULL == file || force) {
-                /* Release resources since ModelicaIO_readRealTable may fail with
+                /* Release resources since ModelicaIO_readRealTable2 may fail with
                    ModelicaError
                 */
                 MUTEX_UNLOCK();
                 free(key);
 #endif
-                table = ModelicaIO_readRealTable(fileName, tableName,
-                    nRow, nCol, verbose);
+                table = ModelicaIO_readRealTable2(fileName, tableName,
+                    nRow, nCol, verbose, delimiter, nHeaderLines);
                 if (NULL == table) {
 #if defined(TABLE_SHARE)
                     return file;
