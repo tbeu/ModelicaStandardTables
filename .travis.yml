@@ -21,7 +21,7 @@ addons:
     build_command: make
     branch_pattern: coverity_scan
 
-matrix:
+jobs:
   include:
     - os: linux
       compiler: gcc-4.4
@@ -64,14 +64,16 @@ matrix:
       env:
         - CPPFLAGS="-DHAVE_ZLIB=1 -DTABLE_SHARE -DHAVE_HDF5=1 -DNDEBUG -DHAVE_UNISTD_H=1 -DHAVE_STDARG_H=1 -DHAVE_HIDDEN=1 -DHAVE_MEMCPY=1"
     - os: osx
+      osx_image: xcode10.3
       compiler: gcc
       env:
         - CPPFLAGS="-DHAVE_ZLIB=1 -DTABLE_SHARE -DNDEBUG -DHAVE_UNISTD_H=1 -DHAVE_STDARG_H=1 -DHAVE_HIDDEN=1 -DHAVE_MEMCPY=1"
     - os: osx
+      osx_image: xcode10.3
       compiler: clang
       env:
         - CPPFLAGS="-DHAVE_ZLIB=1 -DTABLE_SHARE -DNDEBUG -DHAVE_UNISTD_H=1 -DHAVE_STDARG_H=1 -DHAVE_HIDDEN=1 -DHAVE_MEMCPY=1"
- 
+
 env:
   global:
     # COVERITY_SCAN_TOKEN
@@ -81,7 +83,7 @@ env:
     - DEPLOY_LIBS="libModelicaStandardTables.a libModelicaIO.a libModelicaMatIO.a libzlib.a"
     # BBPASS
     - secure: "K/tznRiOBs4Vz2oNgXTkp07mLPXjj0UCqMHjhI7GeDpbVVTbzfIRJkqPeQN+i9kzxUqBx32P8fdaw1FTUi/hS+ZnW2HvsLnr9zvsI1jycGWoF5ZxiYYy+lpK3t3Wa6zerJgVJTHo6Y0jr2aQZL2HX5rj9Q5hDAWiZXCjP4avMp8wpujLZ5f/THC8BBSxyRL7OT2inZZJwUvDDZXHZaof85R3+ACkyACniD/N0yxXSDdqNXrhOdOK2ygi7ZQuyrnzZWXndBpwcygHs1WG5W1hV3oOcUSajCMVxcCJnhfoo5IwSzCyvc3YOHPRm3ZvC/FKy8nP2GddCVsuqTN9ygE2AS3kqQWQGXvqH+/aKEITzfsVyyUkiArHBm/56+ck0ANGLo6Ns03Qlzud6vdvI2uaKWzfXWa/EA0ZNGAMTmp0bdBb9ziQdyPO5HCUPf+MiUPyVGrUm/SV/Xbrp88he3gjUoM9J7Y2LXOOj/c8XSqOUL+/bZYZpHg/KkBQz79pjCQHXD2Vx8ioZMDfaem2ew0tUbPd4BfxnxCLi+KujPZjo3uJozsXRi9IIYJO2a/d77zlAUUhPLQE6FOYfrPfqiO/1s367A5fiIJuHK3eGCV/UbFdOIPMHm/uppch3TtrWEzO0B7bjHZxRcznEcVv2GZGaj2l8CrV6FPfKNYarCS1HQM="
-   
+
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
   - curl https://bitbucket.org/Swyter/bitbucket-curl-upload-to-repo-downloads/raw/default/upload-to-bitbucket.sh -O -J -L
@@ -114,5 +116,3 @@ script:
 
 notifications:
   email: false
-
-sudo: required
