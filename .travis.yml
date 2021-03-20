@@ -88,8 +88,9 @@ before_install:
   - chmod +x ./upload-to-bitbucket.sh
 
 install:
-  - if [[ "$CPPFLAGS" == *"HDF5"* ]]; then git clone --depth 1 --branch hdf5-1_8_21 https://git.hdfgroup.org/scm/hdffv/hdf5.git hdf5_1_8_21; fi
-  - if [[ "$CPPFLAGS" == *"HDF5"* ]]; then cd hdf5_1_8_21; fi
+  - if [[ "$CPPFLAGS" == *"HDF5"* ]]; then wget --no-check-certificate -nv "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8/hdf5-1.8.22/src/hdf5-1.8.22.tar.gz"; fi
+  - if [[ "$CPPFLAGS" == *"HDF5"* ]]; then tar -xzf hdf5-1.8.22.tar.gz; fi
+  - if [[ "$CPPFLAGS" == *"HDF5"* ]]; then cd hdf5-1.8.22; fi
   - if [[ "$CPPFLAGS" == *"HDF5"* ]]; then ./configure --quiet --enable-shared --enable-production --enable-debug=no --with-pic --disable-deprecated-symbols --disable-hl --with-default-api-version=v18 CFLAGS="-O3 -w" CPPFLAGS="-DNDEBUG"; fi
   - if [[ "$CPPFLAGS" == *"HDF5"* ]]; then make install -C src; fi
   - if [[ "$CPPFLAGS" == *"HDF5"* ]]; then cd $TRAVIS_BUILD_DIR; fi
@@ -102,8 +103,8 @@ before_script:
   - cd ../BuildProjects/gcc
 
 script:
-  - if [[ "$COVERITY_SCAN_BRANCH" != 1 ]]; then make CFLAGS="-O3 -Wno-attributes -msse2 -m32 -fPIC -I$TRAVIS_BUILD_DIR/hdf5_1_8_21/hdf5/include" CPPFLAGS="$CPPFLAGS" TARGETDIR="linux32"; fi
-  - if [[ "$COVERITY_SCAN_BRANCH" != 1 ]]; then make CFLAGS="-O3 -Wno-attributes -fPIC -I$TRAVIS_BUILD_DIR/hdf5_1_8_21/hdf5/include" CPPFLAGS="$CPPFLAGS" TARGETDIR="linux64"; fi
+  - if [[ "$COVERITY_SCAN_BRANCH" != 1 ]]; then make CFLAGS="-O3 -Wno-attributes -msse2 -m32 -fPIC -I$TRAVIS_BUILD_DIR/hdf5-1.8.22/hdf5/include" CPPFLAGS="$CPPFLAGS" TARGETDIR="linux32"; fi
+  - if [[ "$COVERITY_SCAN_BRANCH" != 1 ]]; then make CFLAGS="-O3 -Wno-attributes -fPIC -I$TRAVIS_BUILD_DIR/hdf5-1.8.22/hdf5/include" CPPFLAGS="$CPPFLAGS" TARGETDIR="linux64"; fi
   - if [[ "$COVERITY_SCAN_BRANCH" != 1 ]]; then cd ../../Library/linux32; fi
   - if [[ "$COVERITY_SCAN_BRANCH" != 1 ]]; then tar cJf ModelicaStandardTables_linux32.tar.xz $DEPLOY_LIBS; fi
   - if [[ "$COVERITY_SCAN_BRANCH" != 1 ]] && [[ "$TRAVIS_OS_NAME" == "linux" ]] && [[ "$CC" == "gcc-4.8" ]]; then sh ../../upload-to-bitbucket.sh tbeu $BBPASS /tbeu/downloads/downloads ModelicaStandardTables_linux32.tar.xz; fi
