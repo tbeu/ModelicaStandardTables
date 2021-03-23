@@ -1482,7 +1482,7 @@ ReadCompressedCharData(mat_t *mat, z_streamp z, void *data, enum matio_types dat
             err = InflateData(mat, z, data, (mat_uint32_t)nBytes);
             if ( mat->byteswap ) {
                 mat_uint16_t *ptr = (mat_uint16_t *)data;
-                int i;
+                size_t i;
                 for ( i = 0; i < len; i++ ) {
                     Mat_uint16Swap((mat_uint16_t *)&ptr[i]);
                 }
@@ -1507,7 +1507,7 @@ static size_t
 ReadCharData(mat_t *mat, void *_data, enum matio_types data_type, size_t len)
 {
     size_t nBytes = 0;
-    int err;
+    int err = 0;
     size_t data_size;
 
     if ( mat == NULL || _data == NULL || mat->fp == NULL )
@@ -3535,9 +3535,27 @@ Mat_VarCreate(const char *name, enum matio_classes class_type, enum matio_types 
         matvar->data_size = sizeof(mat_sparse_t);
         matvar->nbytes = matvar->data_size;
     } else if ( matvar->class_type == MAT_C_CHAR && matvar->data_type == MAT_T_UTF8 ) {
-        matvar->nbytes = strlen((const char *)data);
+        size_t k = 0;
+        if ( data != NULL ) {
+            size_t i;
+            mat_uint8_t *ptr = (mat_uint8_t *)data;
+            for ( i = 0; i < nelems; i++ ) {
+                const mat_uint8_t c = ptr[k];
+                if ( c <= 0x7F ) {
+                    k++;
+                } else if ( (c & 0xE0) == 0xC0 ) {
+                    k += 2;
+                } else if ( (c & 0xF0) == 0xE0 ) {
+                    k += 3;
+                } else if ( (c & 0xF8) == 0xF0 ) {
+                    k += 4;
+                }
+            }
+        }
+        matvar->nbytes = k;
+        matvar->data_size = (int)data_size;
     } else {
-        matvar->data_size = data_size;
+        matvar->data_size = (int)data_size;
         err = Mul(&matvar->nbytes, nelems, matvar->data_size);
         if ( err ) {
             Mat_VarFree(matvar);
@@ -3548,8 +3566,6 @@ Mat_VarCreate(const char *name, enum matio_classes class_type, enum matio_types 
     if ( data == NULL ) {
         if ( MAT_C_CELL == matvar->class_type && nelems > 0 )
             matvar->data = calloc(nelems, sizeof(matvar_t *));
-        else
-            matvar->data = NULL;
     } else if ( opt & MAT_F_DONT_COPY_DATA ) {
         matvar->data = data;
         matvar->mem_conserve = 1;
@@ -12542,6 +12558,24 @@ Mat_H5ReadDatasetInfo(mat_t *mat, matvar_t *matvar, hid_t dset_id)
             matvar->isComplex = MAT_F_COMPLEX;
         }
         H5Tclose(type_id);
+    }
+
+    /* Test if dataset is deflated */
+    {
+        hid_t plist_id = H5Dget_create_plist(dset_id);
+        if ( plist_id > 0 ) {
+            const int nFilters = H5Pget_nfilters(plist_id);
+            int i;
+            for ( i = 0; i < nFilters; i++ ) {
+                const H5Z_filter_t filterType =
+                    H5Pget_filter2(plist_id, i, NULL, NULL, 0, 0, NULL, NULL);
+                if ( H5Z_FILTER_DEFLATE == filterType ) {
+                    matvar->compression = MAT_COMPRESSION_ZLIB;
+                    break;
+                }
+            }
+            H5Pclose(plist_id);
+        }
     }
 
     /* If the dataset is a cell array read the info of the cells */
