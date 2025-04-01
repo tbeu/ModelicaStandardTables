@@ -4,10 +4,6 @@ C sources of the ModelicaStandardTables - Modelica library for reading data from
 
 The library was presented at the [10th International Modelica Conference](https://modelica.org/events/modelica2014/proceedings/html/sessions/session_5E.html). Detailed remarks on the implementation can be found in the [article](http://dx.doi.org/10.3384/ecp14096893).
 
-## Build status
-
-[![Build Status](https://app.travis-ci.com/tbeu/ModelicaStandardTables.svg?branch=master)](https://app.travis-ci.com/tbeu/ModelicaStandardTables) [![Coverity Scan Build Status](https://scan.coverity.com/projects/7679/badge.svg)](https://scan.coverity.com/projects/tbeu-modelicastandardtables)
-
 ## License
 
 ModelicaStandardTables is released under the terms of the Revised BSD License.
