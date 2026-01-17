@@ -1,3 +1,9 @@
+----------
+
+**This repository has been archived. Development is continued on [ModelicaTableAdditions](https://github.com/tbeu/ModelicaTableAdditions).**
+
+----------
+
 # ModelicaStandardTables
 
 C sources of the ModelicaStandardTables - Modelica library for reading data from Text or MATLAB MAT-files, interpolation and extrapolation.
